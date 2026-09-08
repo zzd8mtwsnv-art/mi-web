@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { GlassModal } from '../ui/GlassModal';
 import { GlassButton } from '../ui/GlassButton';
 import { AVAILABLE_COLORS } from '../../utils/icons';
-import { User, LogOut, Trash2, Plus, RefreshCw, Check } from 'lucide-react';
+import { User, LogOut, Trash2, Plus, RefreshCw, Check, Cloud, Mail } from 'lucide-react';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -12,6 +12,7 @@ interface ProfileModalProps {
 
 export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
   const {
+    authUser,
     currentUser,
     profiles,
     login,
@@ -19,6 +20,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     deleteProfile,
     createProfile,
     clearCurrentUserData,
+    syncStatus,
     logout
   } = useApp();
 
@@ -80,8 +82,8 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     onClose();
   };
 
@@ -92,7 +94,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
       isOpen={isOpen}
       onClose={onClose}
       title="Gestión de Cuenta & Perfil"
-      subtitle="Personaliza tus datos, cambia de estudiante o empieza en blanco"
+      subtitle="Personaliza tus datos, revisa la sincronización o cambia de cuenta"
       maxWidth="md"
     >
       <div className="space-y-5">
@@ -107,7 +109,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 : 'text-slate-500'
             }`}
           >
-            Mi Perfil
+            Mi Cuenta
           </button>
           <button
             type="button"
@@ -118,7 +120,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 : 'text-slate-500'
             }`}
           >
-            Cambiar Cuenta
+            Cambiar Perfil
           </button>
           <button
             type="button"
@@ -129,26 +131,40 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
                 : 'text-slate-500'
             }`}
           >
-            + Nueva
+            + Nuevo
           </button>
         </div>
 
         {/* TAB 1: EDIT PROFILE */}
         {activeTab === 'edit' && (
           <form onSubmit={handleUpdate} className="space-y-4">
-            <div className="flex items-center gap-3 p-3 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5">
-              <div
-                style={{ backgroundColor: avatarColor }}
-                className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-md"
-              >
-                {name.charAt(0).toUpperCase() || 'U'}
-              </div>
-              <div className="flex-1">
-                <span className="text-xs font-bold text-slate-900 dark:text-white block">
+            <div className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5">
+              {authUser?.photoURL ? (
+                <img
+                  src={authUser.photoURL}
+                  alt={name}
+                  className="w-12 h-12 rounded-2xl object-cover shadow-md ring-2 ring-indigo-500/30"
+                />
+              ) : (
+                <div
+                  style={{ backgroundColor: avatarColor }}
+                  className="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-md"
+                >
+                  {name.charAt(0).toUpperCase() || 'U'}
+                </div>
+              )}
+
+              <div className="flex-1 min-w-0">
+                <span className="text-sm font-extrabold text-slate-900 dark:text-white block truncate">
                   {name || 'Estudiante'}
                 </span>
-                <span className="text-[11px] text-slate-400 block">
-                  {gradeLevel} {currentUser.isDemo && '• (Demo)'}
+                {authUser?.email && (
+                  <span className="text-xs text-indigo-500 font-medium flex items-center gap-1 truncate">
+                    <Mail className="w-3 h-3 shrink-0" /> {authUser.email}
+                  </span>
+                )}
+                <span className="text-[11px] text-slate-400 block mt-0.5">
+                  {gradeLevel} {currentUser.isDemo ? '• (Modo Demo)' : '• Cuenta en la Nube'}
                 </span>
               </div>
             </div>
@@ -185,27 +201,6 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               </select>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                Color de Identificación
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {AVAILABLE_COLORS.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => setAvatarColor(c)}
-                    style={{ backgroundColor: c }}
-                    className={`w-6 h-6 rounded-full transition-transform ${
-                      avatarColor === c
-                        ? 'ring-4 ring-offset-2 ring-indigo-500 scale-110'
-                        : 'opacity-70 hover:opacity-100'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-
             {/* Clear Data & Logout Options */}
             <div className="pt-3 border-t border-slate-200/60 dark:border-white/10 space-y-2">
               <button
@@ -219,9 +214,9 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) =
               <button
                 type="button"
                 onClick={handleLogout}
-                className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-rose-500/10 hover:text-rose-600 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold text-xs transition-all flex items-center justify-center gap-1.5"
+                className="w-full py-2 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white font-semibold text-xs transition-all flex items-center justify-center gap-1.5"
               >
-                <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión / Salir
+                <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión
               </button>
             </div>
 

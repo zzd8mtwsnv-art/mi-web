@@ -1,9 +1,24 @@
-import { Subject, Task, Exam, ScheduleItem, FocusSession, GradeItem, Goal, StudyPlan, NotificationItem, Settings, UserProfile } from '../types';
+import {
+  Subject,
+  Task,
+  Exam,
+  ScheduleItem,
+  FocusSession,
+  GradeItem,
+  Goal,
+  StudyPlan,
+  NotificationItem,
+  Settings,
+  UserProfile,
+  CustomEvent,
+  AuthUser
+} from '../types';
 import { getTodayDateString } from './dateUtils';
 
 const STORAGE_KEYS = {
   PROFILES: 'studyflow_profiles_v1',
   CURRENT_USER_ID: 'studyflow_current_user_id_v1',
+  AUTH_USER: 'studyflow_auth_user_v1',
   SUBJECTS: 'studyflow_subjects_v1',
   TASKS: 'studyflow_tasks_v1',
   EXAMS: 'studyflow_exams_v1',
@@ -13,6 +28,7 @@ const STORAGE_KEYS = {
   GOALS: 'studyflow_goals_v1',
   PLANS: 'studyflow_plans_v1',
   NOTIFICATIONS: 'studyflow_notifications_v1',
+  CUSTOM_EVENTS: 'studyflow_custom_events_v1',
   SETTINGS: 'studyflow_settings_v1',
   STREAK_RECORD: 'studyflow_streak_record_v1',
 };
@@ -28,13 +44,50 @@ export const DEFAULT_PROFILES: UserProfile[] = [
   }
 ];
 
+export const DEFAULT_CUSTOM_EVENTS: CustomEvent[] = [
+  {
+    id: 'ev-1',
+    title: 'Exposición Oral: Cortes de Cádiz y Constitución de 1812',
+    description: 'Presentación con diapositivas en grupo (10 minutos de exposición + preguntas).',
+    type: 'exposicion',
+    date: new Date(Date.now() + 86400000 * 6).toISOString().split('T')[0],
+    time: '10:30',
+    subjectId: 'sub-his',
+    color: '#F59E0B',
+    completed: false,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'ev-2',
+    title: 'Jornada Cultural y Festivo Escolar',
+    description: 'Actividades en el centro y descanso lectivo.',
+    type: 'evento',
+    date: new Date(Date.now() + 86400000 * 14).toISOString().split('T')[0],
+    color: '#8B5CF6',
+    completed: false,
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'ev-3',
+    title: 'Recordatorio: Llevar calculadora científica y regla al examen',
+    description: 'Comprobar pilas de la calculadora no programable.',
+    type: 'recordatorio',
+    date: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0],
+    time: '08:15',
+    subjectId: 'sub-mat',
+    color: '#06B6D4',
+    completed: false,
+    createdAt: new Date().toISOString()
+  }
+];
+
 // Realistic Spanish Bachillerato Sample Data
 export const DEFAULT_SUBJECTS: Subject[] = [
   {
     id: 'sub-mat',
     name: 'Matemáticas II',
     shortName: 'Mates',
-    color: '#6366F1', // Indigo
+    color: '#6366F1',
     icon: 'Calculator',
     teacher: 'D. Manuel García',
     classroom: 'Aula 204',
@@ -46,7 +99,7 @@ export const DEFAULT_SUBJECTS: Subject[] = [
     id: 'sub-fis',
     name: 'Física y Química',
     shortName: 'Física',
-    color: '#EC4899', // Pink
+    color: '#EC4899',
     icon: 'Atom',
     teacher: 'Dña. Elena Vega',
     classroom: 'Lab 2',
@@ -58,7 +111,7 @@ export const DEFAULT_SUBJECTS: Subject[] = [
     id: 'sub-len',
     name: 'Lengua Castellana y Literatura',
     shortName: 'Lengua',
-    color: '#F59E0B', // Amber
+    color: '#F59E0B',
     icon: 'BookOpen',
     teacher: 'D. Carlos Rivas',
     classroom: 'Aula 204',
@@ -70,7 +123,7 @@ export const DEFAULT_SUBJECTS: Subject[] = [
     id: 'sub-his',
     name: 'Historia de España',
     shortName: 'Historia',
-    color: '#10B981', // Emerald
+    color: '#10B981',
     icon: 'Landmark',
     teacher: 'Dña. María Santos',
     classroom: 'Aula 204',
@@ -82,7 +135,7 @@ export const DEFAULT_SUBJECTS: Subject[] = [
     id: 'sub-ing',
     name: 'Inglés C1',
     shortName: 'Inglés',
-    color: '#06B6D4', // Cyan
+    color: '#06B6D4',
     icon: 'Globe',
     teacher: 'Sarah Jenkins',
     classroom: 'Aula Idiomas',
@@ -94,7 +147,7 @@ export const DEFAULT_SUBJECTS: Subject[] = [
     id: 'sub-eco',
     name: 'Economía de la Empresa',
     shortName: 'Economía',
-    color: '#8B5CF6', // Purple
+    color: '#8B5CF6',
     icon: 'TrendingUp',
     teacher: 'D. Alberto Navarro',
     classroom: 'Aula 102',
@@ -110,7 +163,7 @@ export const DEFAULT_TASKS: Task[] = [
     title: 'Ejercicios de Matrices y Determinantes (Pág. 45: 12-18)',
     description: 'Resolver problemas de rango y discusión de sistemas con parámetro k.',
     subjectId: 'sub-mat',
-    dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], // tomorrow
+    dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
     dueTime: '18:00',
     priority: 'alta',
     status: 'pendiente',
@@ -169,7 +222,7 @@ export const DEFAULT_EXAMS: Exam[] = [
     id: 'exam-1',
     title: 'Examen Bloque I: Álgebra Lineal y Matrices',
     subjectId: 'sub-mat',
-    date: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0], // in 4 days
+    date: new Date(Date.now() + 86400000 * 4).toISOString().split('T')[0],
     time: '09:30',
     classroom: 'Aula 204',
     topics: 'Tema 1: Matrices y Operaciones, Tema 2: Determinantes, Tema 3: Sistemas de Rouché-Frobenius',
@@ -387,6 +440,18 @@ export const storage = {
     }
   },
 
+  getAuthUser: (): AuthUser | null => {
+    const data = localStorage.getItem(STORAGE_KEYS.AUTH_USER);
+    return data ? JSON.parse(data) : null;
+  },
+  setAuthUser: (user: AuthUser | null) => {
+    if (user) {
+      localStorage.setItem(STORAGE_KEYS.AUTH_USER, JSON.stringify(user));
+    } else {
+      localStorage.removeItem(STORAGE_KEYS.AUTH_USER);
+    }
+  },
+
   getSubjects: (): Subject[] => {
     const data = localStorage.getItem(STORAGE_KEYS.SUBJECTS);
     return data ? JSON.parse(data) : DEFAULT_SUBJECTS;
@@ -459,6 +524,14 @@ export const storage = {
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify(data));
   },
 
+  getCustomEvents: (): CustomEvent[] => {
+    const data = localStorage.getItem(STORAGE_KEYS.CUSTOM_EVENTS);
+    return data ? JSON.parse(data) : DEFAULT_CUSTOM_EVENTS;
+  },
+  setCustomEvents: (data: CustomEvent[]) => {
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_EVENTS, JSON.stringify(data));
+  },
+
   getSettings: (): Settings => {
     const data = localStorage.getItem(STORAGE_KEYS.SETTINGS);
     return data ? JSON.parse(data) : DEFAULT_SETTINGS;
@@ -485,6 +558,7 @@ export const storage = {
     localStorage.setItem(STORAGE_KEYS.GOALS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.PLANS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.NOTIFICATIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.CUSTOM_EVENTS, JSON.stringify([]));
     localStorage.setItem(STORAGE_KEYS.STREAK_RECORD, '0');
   },
 
@@ -498,6 +572,7 @@ export const storage = {
     localStorage.removeItem(STORAGE_KEYS.GOALS);
     localStorage.removeItem(STORAGE_KEYS.PLANS);
     localStorage.removeItem(STORAGE_KEYS.NOTIFICATIONS);
+    localStorage.removeItem(STORAGE_KEYS.CUSTOM_EVENTS);
     localStorage.removeItem(STORAGE_KEYS.SETTINGS);
     localStorage.removeItem(STORAGE_KEYS.STREAK_RECORD);
   },
@@ -506,6 +581,7 @@ export const storage = {
     const state = {
       profiles: storage.getProfiles(),
       currentUserId: storage.getCurrentUserId(),
+      authUser: storage.getAuthUser(),
       subjects: storage.getSubjects(),
       tasks: storage.getTasks(),
       exams: storage.getExams(),
@@ -515,6 +591,7 @@ export const storage = {
       goals: storage.getGoals(),
       plans: storage.getPlans(),
       notifications: storage.getNotifications(),
+      customEvents: storage.getCustomEvents(),
       settings: storage.getSettings(),
       streakRecord: storage.getStreakRecord(),
       exportDate: new Date().toISOString()
@@ -536,6 +613,7 @@ export const storage = {
       if (parsed.goals) storage.setGoals(parsed.goals);
       if (parsed.plans) storage.setPlans(parsed.plans);
       if (parsed.notifications) storage.setNotifications(parsed.notifications);
+      if (parsed.customEvents) storage.setCustomEvents(parsed.customEvents);
       if (parsed.settings) storage.setSettings(parsed.settings);
       if (parsed.streakRecord) storage.setStreakRecord(parsed.streakRecord);
       return true;

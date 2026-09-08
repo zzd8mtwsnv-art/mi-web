@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import confetti from 'canvas-confetti';
 import {
   UserProfile,
+  AuthUser,
   Subject,
   Task,
   Exam,
@@ -12,6 +13,8 @@ import {
   StudyPlan,
   NotificationItem,
   Settings,
+  CustomEvent,
+  SyncStatus,
   TaskStatus
 } from '../types';
 import {
@@ -25,17 +28,39 @@ import {
   DEFAULT_GOALS,
   DEFAULT_SETTINGS,
   DEFAULT_NOTIFICATIONS,
+  DEFAULT_CUSTOM_EVENTS,
   generateDefaultSessions
 } from '../utils/storage';
+import {
+  isFirebaseConfigured,
+  signInWithGoogle,
+  signInWithApple,
+  logOutFirebase,
+  onAuthChange
+} from '../utils/firebase';
+import {
+  saveCloudData,
+  migrateOrLoadUserData,
+  CloudStudyData
+} from '../utils/cloudSync';
 import { soundManager } from '../utils/sound';
 import { getTodayDateString } from '../utils/dateUtils';
 
 interface AppContextType {
-  // Auth & Profile
+  // Auth & Cloud State
+  authUser: AuthUser | null;
   currentUser: UserProfile | null;
   profiles: UserProfile[];
+  isAuthLoading: boolean;
+  syncStatus: SyncStatus;
+  isFirebaseReady: boolean;
+  loginWithGoogle: () => Promise<void>;
+  loginWithApple: () => Promise<void>;
+  loginAsDemo: () => void;
+  logout: () => Promise<void>;
+
+  // Profiles
   login: (profileId: string) => void;
-  logout: () => void;
   createProfile: (data: { name: string; gradeLevel: string; avatarColor: string; startBlank?: boolean }) => void;
   updateProfile: (id: string, data: Partial<UserProfile>) => void;
   deleteProfile: (id: string) => void;
@@ -63,6 +88,7 @@ interface AppContextType {
   goals: Goal[];
   plans: StudyPlan[];
   notifications: NotificationItem[];
+  customEvents: CustomEvent[];
   settings: Settings;
   streakRecord: number;
 
@@ -107,6 +133,12 @@ interface AppContextType {
   deleteStudyPlan: (id: string) => void;
   togglePlanMilestone: (planId: string, milestoneId: string) => void;
 
+  // Actions - Custom Events (Evento, Exposición, Recordatorio)
+  addCustomEvent: (event: Omit<CustomEvent, 'id' | 'createdAt'>) => CustomEvent;
+  updateCustomEvent: (id: string, data: Partial<CustomEvent>) => void;
+  deleteCustomEvent: (id: string) => void;
+  toggleCustomEventComplete: (id: string) => void;
+
   // Actions - Notifications & Settings
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
@@ -130,7 +162,13 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Profiles & Auth State
+  // Auth State
+  const [authUser, setAuthUser] = useState<AuthUser | null>(() => storage.getAuthUser());
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('offline');
+  const isFirebaseReady = isFirebaseConfigured();
+
+  // Profiles State
   const [profiles, setProfiles] = useState<UserProfile[]>(() => storage.getProfiles());
   const [currentUserId, setCurrentUserId] = useState<string | null>(() => storage.getCurrentUserId());
 
@@ -141,7 +179,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
-  // Core state from local storage
+  // Core study data
   const [subjects, setSubjects] = useState<Subject[]>(() => storage.getSubjects());
   const [tasks, setTasks] = useState<Task[]>(() => storage.getTasks());
   const [exams, setExams] = useState<Exam[]>(() => storage.getExams());
@@ -151,14 +189,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [goals, setGoals] = useState<Goal[]>(() => storage.getGoals());
   const [plans, setPlans] = useState<StudyPlan[]>(() => storage.getPlans());
   const [notifications, setNotifications] = useState<NotificationItem[]>(() => storage.getNotifications());
+  const [customEvents, setCustomEvents] = useState<CustomEvent[]>(() => storage.getCustomEvents());
   const [settings, setSettings] = useState<Settings>(() => storage.getSettings());
   const [streakRecord, setStreakRecord] = useState<number>(() => storage.getStreakRecord());
 
-  // Sync Profiles & Auth
+  // Sync to Local Storage
   useEffect(() => { storage.setProfiles(profiles); }, [profiles]);
   useEffect(() => { storage.setCurrentUserId(currentUserId); }, [currentUserId]);
-
-  // Sync core state to storage
+  useEffect(() => { storage.setAuthUser(authUser); }, [authUser]);
   useEffect(() => { storage.setSubjects(subjects); }, [subjects]);
   useEffect(() => { storage.setTasks(tasks); }, [tasks]);
   useEffect(() => { storage.setExams(exams); }, [exams]);
@@ -168,11 +206,144 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => { storage.setGoals(goals); }, [goals]);
   useEffect(() => { storage.setPlans(plans); }, [plans]);
   useEffect(() => { storage.setNotifications(notifications); }, [notifications]);
+  useEffect(() => { storage.setCustomEvents(customEvents); }, [customEvents]);
   useEffect(() => { storage.setSettings(settings); }, [settings]);
   useEffect(() => { storage.setStreakRecord(streakRecord); }, [streakRecord]);
 
-  // Find active profile
-  const currentUser = profiles.find((p) => p.id === currentUserId) || null;
+  // Handle active current user profile
+  const currentUser: UserProfile | null = authUser
+    ? {
+        id: authUser.uid,
+        name: authUser.displayName || authUser.email?.split('@')[0] || 'Estudiante',
+        gradeLevel: settings.gradeLevel || '2º Bachillerato',
+        avatarColor: '#6366F1',
+        email: authUser.email || undefined,
+        photoURL: authUser.photoURL || undefined,
+        createdAt: new Date().toISOString(),
+        isDemo: authUser.providerId === 'demo'
+      }
+    : profiles.find((p) => p.id === currentUserId) || null;
+
+  // Cloud Sync Handler (Debounced)
+  const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const syncToCloud = useCallback(async (dataToSync: CloudStudyData) => {
+    if (!authUser || authUser.providerId === 'demo' || !isFirebaseReady) {
+      setSyncStatus('offline');
+      return;
+    }
+
+    setSyncStatus('syncing');
+    const success = await saveCloudData(authUser.uid, dataToSync, authUser);
+    setSyncStatus(success ? 'synced' : 'error');
+  }, [authUser, isFirebaseReady]);
+
+  // Trigger sync on state changes when logged in
+  useEffect(() => {
+    if (authUser && authUser.providerId !== 'demo' && isFirebaseReady) {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      syncTimeoutRef.current = setTimeout(() => {
+        syncToCloud({
+          subjects,
+          tasks,
+          exams,
+          schedule,
+          sessions,
+          grades,
+          goals,
+          plans,
+          notifications,
+          customEvents,
+          settings,
+          streakRecord
+        });
+      }, 1500);
+    }
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    };
+  }, [
+    subjects,
+    tasks,
+    exams,
+    schedule,
+    sessions,
+    grades,
+    goals,
+    plans,
+    notifications,
+    customEvents,
+    settings,
+    streakRecord,
+    authUser,
+    isFirebaseReady,
+    syncToCloud
+  ]);
+
+  // Firebase Auth State Listener & First-time Migration
+  useEffect(() => {
+    if (!isFirebaseReady) {
+      setIsAuthLoading(false);
+      return;
+    }
+
+    const unsubscribe = onAuthChange(async (firebaseUser) => {
+      if (firebaseUser) {
+        const userMeta: AuthUser = {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL,
+          providerId: firebaseUser.providerData[0]?.providerId || 'google.com'
+        };
+        setAuthUser(userMeta);
+        setCurrentUserId(firebaseUser.uid);
+
+        // Run Safe Migration Protocol
+        const currentLocalData: CloudStudyData = {
+          subjects,
+          tasks,
+          exams,
+          schedule,
+          sessions,
+          grades,
+          goals,
+          plans,
+          notifications,
+          customEvents,
+          settings,
+          streakRecord
+        };
+
+        const { data } = await migrateOrLoadUserData(userMeta, currentLocalData);
+        if (data) {
+          if (data.subjects) setSubjects(data.subjects);
+          if (data.tasks) setTasks(data.tasks);
+          if (data.exams) setExams(data.exams);
+          if (data.schedule) setSchedule(data.schedule);
+          if (data.sessions) setSessions(data.sessions);
+          if (data.grades) setGrades(data.grades);
+          if (data.goals) setGoals(data.goals);
+          if (data.plans) setPlans(data.plans);
+          if (data.notifications) setNotifications(data.notifications);
+          if (data.customEvents) setCustomEvents(data.customEvents);
+          if (data.settings) setSettings(data.settings);
+          if (data.streakRecord !== undefined) setStreakRecord(data.streakRecord);
+        }
+        setSyncStatus('synced');
+      } else {
+        // If not authenticated via Firebase, check if local demo user was active
+        const storedAuth = storage.getAuthUser();
+        if (!storedAuth || storedAuth.providerId !== 'demo') {
+          setAuthUser(null);
+        }
+        setSyncStatus('offline');
+      }
+      setIsAuthLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [isFirebaseReady]);
 
   // Handle Theme
   useEffect(() => {
@@ -204,7 +375,72 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  // --- AUTH ACTIONS ---
+  // --- AUTH METHODS ---
+  const loginWithGoogle = async () => {
+    try {
+      const fbUser = await signInWithGoogle();
+      const userMeta: AuthUser = {
+        uid: fbUser.uid,
+        email: fbUser.email,
+        displayName: fbUser.displayName,
+        photoURL: fbUser.photoURL,
+        providerId: 'google.com'
+      };
+      setAuthUser(userMeta);
+      setCurrentUserId(fbUser.uid);
+      soundManager.playCompletionChime();
+    } catch (err: unknown) {
+      console.error('Google sign-in error:', err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      if (errorMsg.includes('popup-closed-by-user')) return;
+      throw err;
+    }
+  };
+
+  const loginWithApple = async () => {
+    try {
+      const fbUser = await signInWithApple();
+      const userMeta: AuthUser = {
+        uid: fbUser.uid,
+        email: fbUser.email,
+        displayName: fbUser.displayName,
+        photoURL: fbUser.photoURL,
+        providerId: 'apple.com'
+      };
+      setAuthUser(userMeta);
+      setCurrentUserId(fbUser.uid);
+      soundManager.playCompletionChime();
+    } catch (err: unknown) {
+      console.error('Apple sign-in error:', err);
+      throw err;
+    }
+  };
+
+  const loginAsDemo = () => {
+    const demoUser: AuthUser = {
+      uid: 'user-demo',
+      email: 'estudiante@demo.studyflow.app',
+      displayName: 'Álex (Demo)',
+      photoURL: null,
+      providerId: 'demo'
+    };
+    setAuthUser(demoUser);
+    setCurrentUserId('user-demo');
+    setSyncStatus('offline');
+    soundManager.playCompletionChime();
+  };
+
+  const logout = async () => {
+    if (isFirebaseReady) {
+      await logOutFirebase();
+    }
+    setAuthUser(null);
+    setCurrentUserId(null);
+    storage.setCurrentUserId(null);
+    storage.setAuthUser(null);
+    setSyncStatus('offline');
+  };
+
   const login = (profileId: string) => {
     const found = profiles.find((p) => p.id === profileId);
     if (found) {
@@ -215,10 +451,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         gradeLevel: found.gradeLevel
       }));
     }
-  };
-
-  const logout = () => {
-    setCurrentUserId(null);
   };
 
   const createProfile = (data: {
@@ -246,7 +478,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
 
     if (data.startBlank) {
-      // Clear data for completely blank experience
       setSubjects([]);
       setTasks([]);
       setExams([]);
@@ -256,6 +487,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setGoals([]);
       setPlans([]);
       setNotifications([]);
+      setCustomEvents([]);
       setStreakRecord(0);
       storage.clearCurrentProfileData();
     }
@@ -296,6 +528,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setGoals([]);
     setPlans([]);
     setNotifications([]);
+    setCustomEvents([]);
     setStreakRecord(0);
     storage.clearCurrentProfileData();
   };
@@ -404,6 +637,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setExams((prev) => prev.filter((e) => e.subjectId !== id));
     setGrades((prev) => prev.filter((g) => g.subjectId !== id));
     setSchedule((prev) => prev.filter((sc) => sc.subjectId !== id));
+    setCustomEvents((prev) => prev.filter((ev) => ev.subjectId !== id));
   };
 
   const addTask = (task: Omit<Task, 'id' | 'createdAt'>): Task => {
@@ -585,6 +819,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     );
   };
 
+  // --- ACTIONS - CUSTOM EVENTS (Evento, Exposición, Recordatorio) ---
+  const addCustomEvent = (event: Omit<CustomEvent, 'id' | 'createdAt'>): CustomEvent => {
+    const newEvent: CustomEvent = {
+      ...event,
+      id: `ev-${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
+    setCustomEvents((prev) => [newEvent, ...prev]);
+    return newEvent;
+  };
+
+  const updateCustomEvent = (id: string, data: Partial<CustomEvent>) => {
+    setCustomEvents((prev) => prev.map((ev) => (ev.id === id ? { ...ev, ...data } : ev)));
+  };
+
+  const deleteCustomEvent = (id: string) => {
+    setCustomEvents((prev) => prev.filter((ev) => ev.id !== id));
+  };
+
+  const toggleCustomEventComplete = (id: string) => {
+    setCustomEvents((prev) =>
+      prev.map((ev) => {
+        if (ev.id === id) {
+          const next = !ev.completed;
+          if (next) soundManager.playCompletionChime();
+          return { ...ev, completed: next };
+        }
+        return ev;
+      })
+    );
+  };
+
   const markNotificationRead = (id: string) => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, read: true } : n))
@@ -616,6 +882,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setGoals(DEFAULT_GOALS);
     setPlans([]);
     setNotifications(DEFAULT_NOTIFICATIONS);
+    setCustomEvents(DEFAULT_CUSTOM_EVENTS);
     setSettings(DEFAULT_SETTINGS);
     setStreakRecord(12);
   };
@@ -627,6 +894,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (ok) {
       setProfiles(storage.getProfiles());
       setCurrentUserId(storage.getCurrentUserId());
+      setAuthUser(storage.getAuthUser());
       setSubjects(storage.getSubjects());
       setTasks(storage.getTasks());
       setExams(storage.getExams());
@@ -636,6 +904,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setGoals(storage.getGoals());
       setPlans(storage.getPlans());
       setNotifications(storage.getNotifications());
+      setCustomEvents(storage.getCustomEvents());
       setSettings(storage.getSettings());
       setStreakRecord(storage.getStreakRecord());
     }
@@ -645,10 +914,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   return (
     <AppContext.Provider
       value={{
+        authUser,
         currentUser,
         profiles,
-        login,
+        isAuthLoading,
+        syncStatus,
+        isFirebaseReady,
+        loginWithGoogle,
+        loginWithApple,
+        loginAsDemo,
         logout,
+
+        login,
         createProfile,
         updateProfile,
         deleteProfile,
@@ -674,6 +951,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         goals,
         plans,
         notifications,
+        customEvents,
         settings,
         streakRecord,
 
@@ -709,6 +987,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         updateStudyPlan,
         deleteStudyPlan,
         togglePlanMilestone,
+
+        addCustomEvent,
+        updateCustomEvent,
+        deleteCustomEvent,
+        toggleCustomEventComplete,
 
         markNotificationRead,
         markAllNotificationsRead,

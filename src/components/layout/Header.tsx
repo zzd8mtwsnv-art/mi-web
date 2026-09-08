@@ -10,6 +10,8 @@ import {
   LogOut,
   ChevronDown,
   RefreshCw,
+  Cloud,
+  CloudOff,
   Sparkles
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
@@ -17,9 +19,11 @@ import { GlassButton } from '../ui/GlassButton';
 
 export const Header: React.FC = () => {
   const {
+    authUser,
     currentUser,
     settings,
     updateSettings,
+    syncStatus,
     setIsSearchOpen,
     setIsQuickAddOpen,
     setIsNotificationsOpen,
@@ -46,6 +50,28 @@ export const Header: React.FC = () => {
     }
   };
 
+  const getSyncBadge = () => {
+    if (syncStatus === 'synced') {
+      return (
+        <span title="Sincronizado con la nube (Firestore)" className="flex items-center gap-1 text-[10px] text-emerald-500 font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+          <Cloud className="w-3 h-3" /> Nube
+        </span>
+      );
+    } else if (syncStatus === 'syncing') {
+      return (
+        <span title="Guardando cambios en la nube..." className="flex items-center gap-1 text-[10px] text-indigo-500 font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 animate-pulse">
+          <RefreshCw className="w-3 h-3 animate-spin" /> Guardando...
+        </span>
+      );
+    } else {
+      return (
+        <span title="Modo local / sin conexión" className="flex items-center gap-1 text-[10px] text-slate-400 font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200/50 dark:border-white/5">
+          <CloudOff className="w-3 h-3" /> Local
+        </span>
+      );
+    }
+  };
+
   return (
     <header className="sticky top-0 z-20 w-full px-4 sm:px-6 py-3 select-none">
       <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto rounded-2xl glass-panel px-4 py-2.5 border border-white/60 dark:border-white/10 shadow-lg shadow-indigo-950/5">
@@ -56,7 +82,7 @@ export const Header: React.FC = () => {
             className="flex items-center gap-3 w-full px-3.5 py-1.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 border border-slate-200/60 dark:border-white/10 text-xs sm:text-sm text-slate-500 dark:text-slate-400 transition-all text-left group"
           >
             <Search className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-            <span className="flex-1 truncate">Buscar asignaturas, tareas, exámenes...</span>
+            <span className="flex-1 truncate">Buscar asignaturas, tareas, exámenes, eventos...</span>
             <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono bg-white/80 dark:bg-slate-900/80 rounded-md border border-slate-300/60 dark:border-white/10 text-slate-500">
               ⌘K
             </kbd>
@@ -65,6 +91,11 @@ export const Header: React.FC = () => {
 
         {/* Right Actions */}
         <div className="flex items-center gap-2">
+          {/* Cloud Sync Status Indicator */}
+          <div className="hidden sm:block">
+            {getSyncBadge()}
+          </div>
+
           {/* Quick Add Button */}
           <GlassButton
             variant="primary"
@@ -126,18 +157,27 @@ export const Header: React.FC = () => {
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
               className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-2xl bg-white/50 dark:bg-slate-800/50 hover:bg-white/80 dark:hover:bg-slate-700/80 border border-slate-200/50 dark:border-white/10 transition-all text-left group"
             >
-              <div
-                style={{ backgroundColor: currentUser?.avatarColor || '#6366F1' }}
-                className="w-7 h-7 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-sm"
-              >
-                {currentUser?.name.charAt(0).toUpperCase() || 'U'}
-              </div>
+              {authUser?.photoURL ? (
+                <img
+                  src={authUser.photoURL}
+                  alt={currentUser?.name || 'Usuario'}
+                  className="w-7 h-7 rounded-xl object-cover shadow-sm ring-1 ring-white/20"
+                />
+              ) : (
+                <div
+                  style={{ backgroundColor: currentUser?.avatarColor || '#6366F1' }}
+                  className="w-7 h-7 rounded-xl flex items-center justify-center text-white font-bold text-xs shadow-sm"
+                >
+                  {currentUser?.name.charAt(0).toUpperCase() || 'U'}
+                </div>
+              )}
+
               <div className="hidden sm:block text-left leading-none">
-                <span className="block text-xs font-bold text-slate-800 dark:text-white">
+                <span className="block text-xs font-bold text-slate-800 dark:text-white truncate max-w-[110px]">
                   {currentUser?.name || 'Estudiante'}
                 </span>
-                <span className="text-[10px] text-slate-400">
-                  {currentUser?.gradeLevel || '2º Bach'}
+                <span className="text-[10px] text-slate-400 truncate max-w-[110px]">
+                  {currentUser?.email || currentUser?.gradeLevel || '2º Bach'}
                 </span>
               </div>
               <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-200 ml-0.5" />
@@ -150,14 +190,22 @@ export const Header: React.FC = () => {
                   onClick={() => setIsDropdownOpen(false)}
                   className="fixed inset-0 z-30"
                 />
-                <div className="absolute right-0 top-full mt-2 w-56 p-2 rounded-2xl bg-white/90 dark:bg-[#131b2e]/95 backdrop-blur-2xl border border-white/60 dark:border-white/15 shadow-2xl shadow-indigo-950/20 z-40 space-y-1">
+                <div className="absolute right-0 top-full mt-2 w-64 p-2 rounded-2xl bg-white/95 dark:bg-[#131b2e]/95 backdrop-blur-2xl border border-white/60 dark:border-white/15 shadow-2xl shadow-indigo-950/20 z-40 space-y-1 animate-fade-in">
                   <div className="px-3 py-2 border-b border-slate-200/50 dark:border-white/10">
                     <span className="text-xs font-bold text-slate-900 dark:text-white block truncate">
                       {currentUser?.name}
                     </span>
-                    <span className="text-[11px] text-slate-400 block truncate">
-                      {currentUser?.gradeLevel}
-                    </span>
+                    {currentUser?.email && (
+                      <span className="text-[11px] text-indigo-500 font-medium block truncate">
+                        {currentUser.email}
+                      </span>
+                    )}
+                    <div className="mt-1.5 flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400">
+                        {currentUser?.gradeLevel}
+                      </span>
+                      {getSyncBadge()}
+                    </div>
                   </div>
 
                   <button
@@ -167,7 +215,7 @@ export const Header: React.FC = () => {
                     }}
                     className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-indigo-50 dark:hover:bg-slate-800 hover:text-indigo-600 dark:hover:text-indigo-400 flex items-center gap-2 transition-colors"
                   >
-                    <User className="w-3.5 h-3.5" /> Editar Perfil / Cambiar Cuenta
+                    <User className="w-3.5 h-3.5" /> Mi Perfil & Ajustes
                   </button>
 
                   <button
@@ -182,7 +230,7 @@ export const Header: React.FC = () => {
                       setIsDropdownOpen(false);
                       logout();
                     }}
-                    className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 transition-colors"
+                    className="w-full px-3 py-2 rounded-xl text-left text-xs font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/30 flex items-center gap-2 transition-colors border-t border-slate-200/40 dark:border-white/5 pt-2 mt-1"
                   >
                     <LogOut className="w-3.5 h-3.5" /> Cerrar Sesión
                   </button>

@@ -1,9 +1,9 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GlassModal } from '../ui/GlassModal';
 import { GlassButton } from '../ui/GlassButton';
-import { CheckSquare, FileText, BookOpen, Clock } from 'lucide-react';
-import { Priority } from '../../types';
+import { CheckSquare, FileText, BookOpen, Clock, Calendar, Sparkles } from 'lucide-react';
+import { Priority, CustomEventType } from '../../types';
 import { getTodayDateString } from '../../utils/dateUtils';
 
 export const QuickAddModal: React.FC = () => {
@@ -14,10 +14,11 @@ export const QuickAddModal: React.FC = () => {
     addTask,
     addExam,
     addSubject,
-    addFocusSession
+    addFocusSession,
+    addCustomEvent
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'task' | 'exam' | 'subject' | 'session'>('task');
+  const [activeTab, setActiveTab] = useState<'task' | 'exam' | 'event' | 'subject' | 'session'>('task');
 
   // Task form state
   const [taskTitle, setTaskTitle] = useState('');
@@ -30,6 +31,13 @@ export const QuickAddModal: React.FC = () => {
   const [examSubjectId, setExamSubjectId] = useState(subjects[0]?.id || '');
   const [examDate, setExamDate] = useState(getTodayDateString());
   const [examImportance, setExamImportance] = useState<'normal' | 'alta' | 'crucial'>('alta');
+
+  // Custom Event form state
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventType, setEventType] = useState<CustomEventType>('evento');
+  const [eventDate, setEventDate] = useState(getTodayDateString());
+  const [eventSubjectId, setEventSubjectId] = useState(subjects[0]?.id || '');
+  const [eventTime, setEventTime] = useState('10:00');
 
   // Subject form state
   const [subName, setSubName] = useState('');
@@ -64,6 +72,22 @@ export const QuickAddModal: React.FC = () => {
       importance: examImportance
     });
     setExamTitle('');
+    setIsQuickAddOpen(false);
+  };
+
+  const handleCreateEvent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventTitle.trim()) return;
+    addCustomEvent({
+      title: eventTitle.trim(),
+      type: eventType,
+      date: eventDate,
+      time: eventTime,
+      subjectId: eventSubjectId || undefined,
+      color: eventType === 'evento' ? '#8B5CF6' : eventType === 'exposicion' ? '#F59E0B' : '#06B6D4',
+      completed: false
+    });
+    setEventTitle('');
     setIsQuickAddOpen(false);
   };
 
@@ -103,11 +127,11 @@ export const QuickAddModal: React.FC = () => {
     >
       <div className="space-y-5">
         {/* Type Selector Tabs */}
-        <div className="grid grid-cols-4 gap-1 p-1 rounded-2xl bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-white/10">
+        <div className="grid grid-cols-5 gap-1 p-1 rounded-2xl bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-white/10">
           <button
             type="button"
             onClick={() => setActiveTab('task')}
-            className={`py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-1 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
               activeTab === 'task'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -118,7 +142,7 @@ export const QuickAddModal: React.FC = () => {
           <button
             type="button"
             onClick={() => setActiveTab('exam')}
-            className={`py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-1 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
               activeTab === 'exam'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -128,19 +152,30 @@ export const QuickAddModal: React.FC = () => {
           </button>
           <button
             type="button"
+            onClick={() => setActiveTab('event')}
+            className={`py-2 px-1 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
+              activeTab === 'event'
+                ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Calendar className="w-3.5 h-3.5" /> Evento
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('subject')}
-            className={`py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-1 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
               activeTab === 'subject'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
             }`}
           >
-            <BookOpen className="w-3.5 h-3.5" /> Asignatura
+            <BookOpen className="w-3.5 h-3.5" /> Materia
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('session')}
-            className={`py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all ${
+            className={`py-2 px-1 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all ${
               activeTab === 'session'
                 ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
                 : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
@@ -281,6 +316,83 @@ export const QuickAddModal: React.FC = () => {
 
             <GlassButton variant="primary" fullWidth type="submit">
               Guardar Examen
+            </GlassButton>
+          </form>
+        )}
+
+        {/* Evento Form (Evento, Exposición, Recordatorio) */}
+        {activeTab === 'event' && (
+          <form onSubmit={handleCreateEvent} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Tipo de Entrada
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'evento', label: 'Evento', color: 'text-purple-500' },
+                  { id: 'exposicion', label: 'Exposición', color: 'text-amber-500' },
+                  { id: 'recordatorio', label: 'Recordatorio', color: 'text-cyan-500' }
+                ].map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => setEventType(t.id as CustomEventType)}
+                    className={`py-2 rounded-xl text-xs font-semibold border transition-all ${
+                      eventType === t.id
+                        ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border-indigo-500/40'
+                        : 'bg-white/40 dark:bg-slate-800/40 text-slate-500 border-slate-200/50 dark:border-white/5'
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                Título *
+              </label>
+              <input
+                autoFocus
+                type="text"
+                required
+                value={eventTitle}
+                onChange={(e) => setEventTitle(e.target.value)}
+                placeholder="Ej. Vacaciones, Exposición oral de Historia, Llevar calculadora..."
+                className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Fecha
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={eventDate}
+                  onChange={(e) => setEventDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-2xl glass-input text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
+                  Hora
+                </label>
+                <input
+                  type="time"
+                  value={eventTime}
+                  onChange={(e) => setEventTime(e.target.value)}
+                  className="w-full px-3 py-2 rounded-2xl glass-input text-sm"
+                />
+              </div>
+            </div>
+
+            <GlassButton variant="primary" fullWidth type="submit">
+              Guardar en Calendario
             </GlassButton>
           </form>
         )}

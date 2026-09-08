@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   Flame,
   Clock,
@@ -9,7 +9,9 @@ import {
   Sparkles,
   ArrowRight,
   BookOpen,
-  Plus
+  Plus,
+  Mic,
+  Bell
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../ui/GlassCard';
@@ -28,12 +30,14 @@ import {
 
 export const DashboardView: React.FC = () => {
   const {
+    currentUser,
     settings,
     subjects,
     tasks,
     exams,
     schedule,
     sessions,
+    customEvents,
     goals,
     currentStreak,
     todayStudyMinutes,
@@ -73,6 +77,9 @@ export const DashboardView: React.FC = () => {
     .filter((t) => t.dueDate <= todayDateStr || t.status === 'en_progreso')
     .slice(0, 5);
 
+  // Today's custom events (Evento, Exposición, Recordatorio)
+  const todayCustomEvents = customEvents.filter((ev) => ev.date === todayDateStr);
+
   // Weekly study data for the Recharts Bar Chart (last 7 days)
   const dayLabels = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
   const weeklyData = Array.from({ length: 7 }).map((_, i) => {
@@ -110,11 +117,11 @@ export const DashboardView: React.FC = () => {
               </span>
               <span className="text-slate-300 dark:text-slate-600">•</span>
               <span className="text-xs text-slate-500 dark:text-slate-400">
-                {settings.gradeLevel}
+                {currentUser?.gradeLevel || settings.gradeLevel}
               </span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {greetingText}, {settings.studentName || 'Estudiante'} 👋
+              {greetingText}, {currentUser?.name || settings.studentName || 'Estudiante'} 👋
             </h1>
             <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-xl">
               Tienes <span className="font-semibold text-indigo-600 dark:text-indigo-400">{pendingTasksCount} tareas</span> pendientes y{' '}
@@ -218,7 +225,6 @@ export const DashboardView: React.FC = () => {
             <div className="text-xl font-extrabold text-slate-900 dark:text-white">
               {dailyProgressPercent}%
             </div>
-            {/* Mini Progress Bar */}
             <div className="w-full bg-slate-200/60 dark:bg-slate-700/60 h-1.5 rounded-full overflow-hidden mt-1.5">
               <div
                 style={{ width: `${dailyProgressPercent}%` }}
@@ -291,6 +297,39 @@ export const DashboardView: React.FC = () => {
           </div>
 
           <GlassCard padding="md" className="space-y-4">
+            {/* Eventos, Exposiciones o Recordatorios de Hoy */}
+            {todayCustomEvents.length > 0 && (
+              <div className="space-y-2 pb-3 border-b border-slate-200/60 dark:border-white/10">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block">
+                  Eventos & Avisos de Hoy ({todayCustomEvents.length})
+                </span>
+                <div className="space-y-2">
+                  {todayCustomEvents.map((ev) => {
+                    const typeColor = ev.type === 'evento' ? 'bg-purple-500/15 text-purple-600 border-purple-500/30' : ev.type === 'exposicion' ? 'bg-amber-500/15 text-amber-600 border-amber-500/30' : 'bg-cyan-500/15 text-cyan-600 border-cyan-500/30';
+                    const Icon = ev.type === 'evento' ? Calendar : ev.type === 'exposicion' ? Mic : Bell;
+
+                    return (
+                      <div
+                        key={ev.id}
+                        className={`p-3 rounded-2xl border flex items-center justify-between gap-3 ${typeColor}`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Icon className="w-4 h-4 shrink-0" />
+                          <div>
+                            <span className="text-xs font-bold block">{ev.title}</span>
+                            {ev.description && <span className="text-[11px] text-slate-500 block">{ev.description}</span>}
+                          </div>
+                        </div>
+                        <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded-md bg-white/60 dark:bg-slate-900/60 shadow-sm">
+                          {ev.type}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Clases de Hoy */}
             <div>
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 block mb-2.5">

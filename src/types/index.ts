@@ -4,14 +4,40 @@ export type GradeCategory = 'examen' | 'trabajo' | 'proyecto' | 'participacion' 
 export type GoalType = 'daily_time' | 'weekly_tasks' | 'subject_grade' | 'custom';
 export type FocusType = 'normal' | 'pomodoro' | 'short_break' | 'long_break';
 export type ThemeMode = 'light' | 'dark' | 'auto';
+export type SyncStatus = 'synced' | 'syncing' | 'offline' | 'error';
+export type CustomEventType = 'evento' | 'exposicion' | 'recordatorio';
+
+export interface AuthUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+  providerId: string; // 'google.com' | 'apple.com' | 'demo'
+  isAnonymous?: boolean;
+}
 
 export interface UserProfile {
   id: string;
   name: string;
   gradeLevel: string; // e.g. "2º Bachillerato Científico-Tecnológico"
   avatarColor: string;
+  email?: string;
+  photoURL?: string;
   createdAt: string;
   isDemo?: boolean;
+}
+
+export interface CustomEvent {
+  id: string;
+  title: string;
+  description?: string;
+  type: CustomEventType;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:mm
+  subjectId?: string;
+  color?: string;
+  completed?: boolean;
+  createdAt: string;
 }
 
 export interface Subject {
@@ -128,7 +154,7 @@ export interface NotificationItem {
   id: string;
   title: string;
   message: string;
-  type: 'exam' | 'task' | 'streak' | 'goal' | 'system';
+  type: 'exam' | 'task' | 'streak' | 'goal' | 'system' | 'custom_event';
   timestamp: string;
   read: boolean;
   actionView?: string;

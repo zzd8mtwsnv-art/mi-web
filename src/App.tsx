@@ -8,6 +8,7 @@ import { QuickAddModal } from './components/layout/QuickAddModal';
 import { NotificationsModal } from './components/layout/NotificationsModal';
 import { ProfileModal } from './components/auth/ProfileModal';
 import { AuthScreen } from './components/auth/AuthScreen';
+import { Sparkles } from 'lucide-react';
 
 // Views
 import { DashboardView } from './components/dashboard/DashboardView';
@@ -23,7 +24,26 @@ import { StatsView } from './components/stats/StatsView';
 import { SettingsView } from './components/settings/SettingsView';
 
 const MainContent: React.FC = () => {
-  const { currentUser, activeView, isProfileModalOpen, setIsProfileModalOpen } = useApp();
+  const { currentUser, isAuthLoading, activeView, isProfileModalOpen, setIsProfileModalOpen } = useApp();
+
+  // Loading state while checking Firebase Auth session
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-[#080d1a] bg-mesh-light dark:bg-mesh-dark">
+        <div className="relative flex flex-col items-center">
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-pink-500 shadow-2xl shadow-indigo-500/35 flex items-center justify-center text-white mb-4 animate-bounce">
+            <Sparkles className="w-8 h-8" />
+          </div>
+          <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
+            StudyFlow
+          </h1>
+          <p className="text-xs text-slate-400 mt-1 animate-pulse">
+            Cargando tu espacio de estudio...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // If no user is logged in, show Auth / Welcome Screen
   if (!currentUser) {

@@ -14,13 +14,18 @@ import {
   User,
   LogOut,
   RefreshCw,
-  Check
+  Check,
+  Cloud,
+  Mail,
+  ShieldCheck
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
   const {
+    authUser,
     currentUser,
     settings,
+    syncStatus,
     updateSettings,
     setIsProfileModalOpen,
     resetDemoData,
@@ -92,7 +97,7 @@ export const SettingsView: React.FC = () => {
           Ajustes & Cuenta
         </h1>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-          Personaliza tu perfil, apariencia Liquid Glass, objetivos de estudio y datos
+          Personaliza tu perfil, sincronización en la nube, apariencia Liquid Glass y copias de seguridad
         </p>
       </div>
 
@@ -101,7 +106,7 @@ export const SettingsView: React.FC = () => {
         <GlassCard padding="lg" className="space-y-4 shadow-xl">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <User className="w-5 h-5 text-indigo-500" /> Perfil del Estudiante
+              <User className="w-5 h-5 text-indigo-500" /> Perfil & Cuenta
             </h2>
 
             <button
@@ -109,27 +114,50 @@ export const SettingsView: React.FC = () => {
               onClick={() => setIsProfileModalOpen(true)}
               className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline"
             >
-              Cambiar de Cuenta
+              Gestionar Cuenta
             </button>
           </div>
 
-          <div className="flex items-center gap-4 p-4 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5">
-            <div
-              style={{ backgroundColor: currentUser?.avatarColor || '#6366F1' }}
-              className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md shrink-0"
-            >
-              {currentUser?.name.charAt(0).toUpperCase() || 'U'}
-            </div>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 p-4 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5">
+            {authUser?.photoURL ? (
+              <img
+                src={authUser.photoURL}
+                alt={currentUser?.name || 'Usuario'}
+                className="w-14 h-14 rounded-2xl object-cover shadow-md ring-2 ring-indigo-500/30 shrink-0"
+              />
+            ) : (
+              <div
+                style={{ backgroundColor: currentUser?.avatarColor || '#6366F1' }}
+                className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-xl shadow-md shrink-0"
+              >
+                {currentUser?.name.charAt(0).toUpperCase() || 'U'}
+              </div>
+            )}
+
             <div className="flex-1 min-w-0">
-              <span className="text-base font-extrabold text-slate-900 dark:text-white block truncate">
-                {currentUser?.name || 'Estudiante'}
-              </span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-base font-extrabold text-slate-900 dark:text-white truncate">
+                  {currentUser?.name || 'Estudiante'}
+                </span>
+                {syncStatus === 'synced' && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 border border-emerald-500/20 flex items-center gap-1">
+                    <Cloud className="w-3 h-3" /> Nube Conectada
+                  </span>
+                )}
+              </div>
+
+              {authUser?.email && (
+                <span className="text-xs text-indigo-500 font-medium flex items-center gap-1 mt-0.5">
+                  <Mail className="w-3.5 h-3.5" /> {authUser.email}
+                </span>
+              )}
+
               <span className="text-xs text-slate-400 block mt-0.5">
-                {currentUser?.gradeLevel} {currentUser?.isDemo && '• (Perfil de Demostración)'}
+                {currentUser?.gradeLevel} {currentUser?.isDemo && '• (Modo Demo)'}
               </span>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end pt-2 sm:pt-0">
               <GlassButton
                 type="button"
                 variant="secondary"
@@ -256,11 +284,11 @@ export const SettingsView: React.FC = () => {
         {/* SECTION: DATOS & COPIAS DE SEGURIDAD */}
         <GlassCard padding="lg" className="space-y-4 shadow-xl">
           <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <RotateCcw className="w-5 h-5 text-indigo-500" /> Copia de Seguridad & Datos Locales
+            <RotateCcw className="w-5 h-5 text-indigo-500" /> Copia de Seguridad & Datos
           </h2>
 
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Tus datos se almacenan de forma segura en tu navegador (LocalStorage). Puedes exportar una copia en archivo JSON, vaciar el perfil actual para empezar de cero o restaurar la demo inicial.
+            Tus datos se guardan tanto en tu navegador como en Firebase Firestore si estás autenticado. Puedes exportar una copia en JSON, vaciar el espacio actual para empezar limpio o restaurar la demo inicial.
           </p>
 
           <div className="flex flex-wrap items-center gap-3 pt-2">
