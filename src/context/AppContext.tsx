@@ -224,6 +224,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
     : profiles.find((p) => p.id === currentUserId) || null;
 
+  // Strict Hydration Guard: Auto-save to Firestore is locked until data has been hydrated from cloud
+  const isHydratedRef = useRef<boolean>(false);
+
   // Cloud Sync Handler (Debounced)
   const syncTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -233,16 +236,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    if (!isHydratedRef.current) {
+      console.warn('[StudyFlow CloudSync] 🛑 Bloqueando guardado: La aplicación aún no ha terminado de hidratar desde Firestore.');
+      return;
+    }
+
     setSyncStatus('syncing');
     const success = await saveCloudData(authUser.uid, dataToSync, authUser);
     setSyncStatus(success ? 'synced' : 'error');
   }, [authUser, isFirebaseReady]);
 
-  // Trigger sync on state changes when logged in
+  // Trigger sync on state changes ONLY AFTER HYDRATION IS COMPLETE
   useEffect(() => {
+    // CRITICAL: Never trigger auto-save before initial hydration from Firestore has completed
+    if (!isHydratedRef.current) {
+      return;
+    }
+
     if (authUser && authUser.providerId !== 'demo' && isFirebaseReady) {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
       syncTimeoutRef.current = setTimeout(() => {
+        console.log('[StudyFlow CloudSync] ⏱️ Temporizador debounce cumplido. Iniciando sincronización con Firestore...');
         syncToCloud({
           subjects,
           tasks,
@@ -257,7 +271,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           settings,
           streakRecord
         });
-      }, 1500);
+      }, 1000);
     }
     return () => {
       if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
@@ -280,15 +294,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncToCloud
   ]);
 
-  // Firebase Auth State Listener & First-time Migration
+  // Firebase Auth State Listener & Initial Hydration
   useEffect(() => {
     if (!isFirebaseReady) {
+      isHydratedRef.current = true;
       setIsAuthLoading(false);
       return;
     }
 
     const unsubscribe = onAuthChange(async (firebaseUser) => {
       if (firebaseUser) {
+        console.log(`[StudyFlow CloudSync] 👤 Usuario autenticado detectado en Firebase: ${firebaseUser.email} (UID: ${firebaseUser.uid})`);
+        
+        // Lock auto-save during hydration
+        isHydratedRef.current = false;
+        setIsAuthLoading(true);
+
         const userMeta: AuthUser = {
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -299,7 +320,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setAuthUser(userMeta);
         setCurrentUserId(firebaseUser.uid);
 
-        // Run Safe Migration Protocol
+        // Prepare current state for possible first-time initialization only
         const currentLocalData: CloudStudyData = {
           subjects,
           tasks,
@@ -316,30 +337,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
 
         const { data } = await migrateOrLoadUserData(userMeta, currentLocalData);
+
         if (data) {
-          if (data.subjects) setSubjects(data.subjects);
-          if (data.tasks) setTasks(data.tasks);
-          if (data.exams) setExams(data.exams);
-          if (data.schedule) setSchedule(data.schedule);
-          if (data.sessions) setSessions(data.sessions);
-          if (data.grades) setGrades(data.grades);
-          if (data.goals) setGoals(data.goals);
-          if (data.plans) setPlans(data.plans);
-          if (data.notifications) setNotifications(data.notifications);
-          if (data.customEvents) setCustomEvents(data.customEvents);
-          if (data.settings) setSettings(data.settings);
+          console.log('[StudyFlow CloudSync] 💧 Hidratando estados de la aplicación con los datos de Firestore...');
+          if (data.subjects !== undefined) setSubjects(data.subjects);
+          if (data.tasks !== undefined) setTasks(data.tasks);
+          if (data.exams !== undefined) setExams(data.exams);
+          if (data.schedule !== undefined) setSchedule(data.schedule);
+          if (data.sessions !== undefined) setSessions(data.sessions);
+          if (data.grades !== undefined) setGrades(data.grades);
+          if (data.goals !== undefined) setGoals(data.goals);
+          if (data.plans !== undefined) setPlans(data.plans);
+          if (data.notifications !== undefined) setNotifications(data.notifications);
+          if (data.customEvents !== undefined) setCustomEvents(data.customEvents);
+          if (data.settings !== undefined) setSettings(data.settings);
           if (data.streakRecord !== undefined) setStreakRecord(data.streakRecord);
         }
-        setSyncStatus('synced');
+
+        // UNLOCK auto-save now that hydration is complete
+        setTimeout(() => {
+          isHydratedRef.current = true;
+          setSyncStatus('synced');
+          setIsAuthLoading(false);
+          console.log('[StudyFlow CloudSync] ✅ Hidratación completada al 100%. Auto-guardado activado para futuros cambios.');
+        }, 100);
+
       } else {
-        // If not authenticated via Firebase, check if local demo user was active
+        // If not authenticated via Firebase
         const storedAuth = storage.getAuthUser();
         if (!storedAuth || storedAuth.providerId !== 'demo') {
           setAuthUser(null);
         }
+        isHydratedRef.current = true;
         setSyncStatus('offline');
+        setIsAuthLoading(false);
       }
-      setIsAuthLoading(false);
     });
 
     return () => unsubscribe();
@@ -426,11 +458,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setAuthUser(demoUser);
     setCurrentUserId('user-demo');
+    isHydratedRef.current = true;
     setSyncStatus('offline');
     soundManager.playCompletionChime();
   };
 
   const logout = async () => {
+    isHydratedRef.current = false;
     if (isFirebaseReady) {
       await logOutFirebase();
     }

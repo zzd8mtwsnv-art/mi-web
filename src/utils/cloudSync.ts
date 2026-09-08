@@ -28,23 +28,41 @@ export interface CloudStudyData {
   customEvents: CustomEvent[];
   settings: Settings;
   streakRecord: number;
+  lastSync?: string;
 }
 
 /**
  * Reads user data from Firestore `users/{userId}/data/main`
  */
 export const fetchCloudData = async (userId: string): Promise<CloudStudyData | null> => {
-  if (!db || !isFirebaseConfigured()) return null;
+  if (!db || !isFirebaseConfigured()) {
+    console.warn('[StudyFlow CloudSync] Firebase no configurado, omitiendo fetch.');
+    return null;
+  }
   try {
+    console.log(`[StudyFlow CloudSync] 🔍 Leyendo Firestore para UID: ${userId}...`);
     const docRef = doc(db, 'users', userId, 'data', 'main');
     const docSnap = await getDoc(docRef);
 
     if (docSnap.exists()) {
-      return docSnap.data() as CloudStudyData;
+      const data = docSnap.data() as CloudStudyData;
+      console.log(`[StudyFlow CloudSync] 📥 Datos recuperados con éxito de Firestore:`, {
+        asignaturas: data.subjects?.length ?? 0,
+        tareas: data.tasks?.length ?? 0,
+        examenes: data.exams?.length ?? 0,
+        horario: data.schedule?.length ?? 0,
+        eventos: data.customEvents?.length ?? 0,
+        notas: data.grades?.length ?? 0,
+        objetivos: data.goals?.length ?? 0,
+        planes: data.plans?.length ?? 0,
+        sesiones: data.sessions?.length ?? 0
+      });
+      return data;
     }
+    console.log(`[StudyFlow CloudSync] ℹ️ Documento users/${userId}/data/main no existe todavía en Firestore.`);
     return null;
   } catch (error) {
-    console.warn('Error al recuperar datos de Firestore:', error);
+    console.error('[StudyFlow CloudSync] ❌ Error al recuperar datos de Firestore:', error);
     return null;
   }
 };
@@ -57,9 +75,23 @@ export const saveCloudData = async (
   data: CloudStudyData,
   userMeta?: AuthUser
 ): Promise<boolean> => {
-  if (!db || !isFirebaseConfigured()) return false;
+  if (!db || !isFirebaseConfigured()) {
+    console.warn('[StudyFlow CloudSync] Firebase no configurado, no se puede guardar en la nube.');
+    return false;
+  }
   try {
-    // 1. Update user document
+    console.log(`[StudyFlow CloudSync] 🚀 Enviando escritura a Firestore para UID [${userId}]:`, {
+      asignaturas: data.subjects?.length ?? 0,
+      tareas: data.tasks?.length ?? 0,
+      examenes: data.exams?.length ?? 0,
+      horario: data.schedule?.length ?? 0,
+      eventos: data.customEvents?.length ?? 0,
+      notas: data.grades?.length ?? 0,
+      objetivos: data.goals?.length ?? 0,
+      timestamp: new Date().toISOString()
+    });
+
+    // 1. Update user metadata document
     const userRef = doc(db, 'users', userId);
     await setDoc(
       userRef,
@@ -76,22 +108,33 @@ export const saveCloudData = async (
     // 2. Update main study data document
     const dataRef = doc(db, 'users', userId, 'data', 'main');
     await setDoc(dataRef, {
-      ...data,
+      subjects: data.subjects ?? [],
+      tasks: data.tasks ?? [],
+      exams: data.exams ?? [],
+      schedule: data.schedule ?? [],
+      sessions: data.sessions ?? [],
+      grades: data.grades ?? [],
+      goals: data.goals ?? [],
+      plans: data.plans ?? [],
+      notifications: data.notifications ?? [],
+      customEvents: data.customEvents ?? [],
+      settings: data.settings,
+      streakRecord: data.streakRecord ?? 0,
       lastSync: new Date().toISOString()
     });
 
+    console.log(`[StudyFlow CloudSync] ✅ Firestore confirmó la escritura exitosa para UID: ${userId}`);
     return true;
   } catch (error) {
-    console.warn('Error al guardar datos en Firestore:', error);
+    console.error('[StudyFlow CloudSync] ❌ Error escribiendo en Firestore:', error);
     return false;
   }
 };
 
 /**
  * Safe First-time Data Migration Protocol:
- * If the user signs in and their cloud account is empty,
- * it safely copies their current local data to their Firebase cloud document.
- * It NEVER deletes local data before verifying.
+ * - If Firestore document exists: ALWAYS return cloud data. CLOUD HAS ABSOLUTE PRIORITY.
+ * - If Firestore is totally empty: create the initial cloud document from local data safely.
  */
 export const migrateOrLoadUserData = async (
   user: AuthUser,
@@ -104,32 +147,28 @@ export const migrateOrLoadUserData = async (
   try {
     const existingCloudData = await fetchCloudData(user.uid);
 
-    if (existingCloudData && existingCloudData.subjects && existingCloudData.subjects.length > 0) {
-      // User already had cloud data (e.g. logging in from another device)
+    // IF CLOUD DOCUMENT EXISTS (regardless of subjects count), FIRESTORE IS THE SOLE TRUTH
+    if (existingCloudData !== null) {
+      console.log('[StudyFlow CloudSync] 🎯 Firestore tiene prioridad absoluta. Cargando datos existentes de la nube.');
       return { data: existingCloudData, isMigrated: false, fromCloud: true };
     }
 
-    // Cloud is empty for this user -> Check if local data has content to migrate
-    const hasLocalContent = (localData.subjects && localData.subjects.length > 0) ||
-                            (localData.tasks && localData.tasks.length > 0);
+    // Cloud document does NOT exist yet (First time user registers with this account)
+    console.log('[StudyFlow CloudSync] 🆕 Primer inicio de sesión detectado para esta cuenta. Creando documento inicial en Firestore...');
 
-    if (hasLocalContent) {
-      // Save a local safety snapshot before migration
-      try {
-        localStorage.setItem(
-          'studyflow_backup_pre_migration',
-          JSON.stringify({ ...localData, backupDate: new Date().toISOString() })
-        );
-      } catch {}
+    // Save a local safety snapshot before migration
+    try {
+      localStorage.setItem(
+        'studyflow_backup_pre_migration',
+        JSON.stringify({ ...localData, backupDate: new Date().toISOString() })
+      );
+    } catch {}
 
-      // Upload local data to the new cloud account
-      await saveCloudData(user.uid, localData, user);
-      return { data: localData, isMigrated: true, fromCloud: false };
-    }
-
-    return { data: localData, isMigrated: false, fromCloud: false };
+    // Upload initial data to the new cloud account
+    await saveCloudData(user.uid, localData, user);
+    return { data: localData, isMigrated: true, fromCloud: false };
   } catch (err) {
-    console.warn('Error en protocolo de migración:', err);
+    console.error('[StudyFlow CloudSync] ❌ Error en protocolo de migración:', err);
     return { data: localData, isMigrated: false, fromCloud: false };
   }
 };
