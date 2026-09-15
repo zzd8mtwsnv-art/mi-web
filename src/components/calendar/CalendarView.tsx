@@ -4,7 +4,8 @@ import { GlassCard } from '../ui/GlassCard';
 import { GlassBadge } from '../ui/GlassBadge';
 import { GlassButton } from '../ui/GlassButton';
 import { EventModal } from './EventModal';
-import { SPANISH_MONTHS } from '../../utils/dateUtils';
+import { DayDetailModal } from './DayDetailModal';
+import { SPANISH_MONTHS, formatMinutes } from '../../utils/dateUtils';
 import {
   ChevronLeft,
   ChevronRight,
@@ -23,8 +24,13 @@ export const CalendarView: React.FC = () => {
   const { tasks, exams, schedule, sessions, customEvents, deleteCustomEvent, toggleCustomEventComplete } = useApp();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
+  
+  // Modals
   const [isEventModalOpen, setIsEventModalOpen] = useState(false);
   const [selectedDateForNewEvent, setSelectedDateForNewEvent] = useState<string>('');
+  
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedDateForDetail, setSelectedDateForDetail] = useState<string>('');
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -51,6 +57,11 @@ export const CalendarView: React.FC = () => {
   };
 
   const handleDayClick = (dateStr: string) => {
+    setSelectedDateForDetail(dateStr);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleOpenAddEventForDate = (dateStr: string) => {
     setSelectedDateForNewEvent(dateStr);
     setIsEventModalOpen(true);
   };
@@ -69,13 +80,104 @@ export const CalendarView: React.FC = () => {
     calendarCells.push({ dayNumber: d, dateStr });
   }
 
-  // Get all items for a given date
-  const getItemsForDate = (dateStr: string) => {
+  // Get and structure items for a given date (with visual aggregation for study)
+  const getDayItems = (dateStr: string) => {
     const dayExams = exams.filter((e) => e.date === dateStr);
     const dayTasks = tasks.filter((t) => t.dueDate === dateStr);
     const daySessions = sessions.filter((s) => s.date.startsWith(dateStr));
     const dayCustomEvents = customEvents.filter((ev) => ev.date === dateStr);
-    return { dayExams, dayTasks, daySessions, dayCustomEvents };
+
+    const totalStudyMinutes = daySessions.reduce((acc, s) => acc + s.durationMinutes, 0);
+
+    const allVisualItems: Array<{
+      id: string;
+      type: 'exam' | 'exposicion' | 'evento' | 'recordatorio' | 'task' | 'study';
+      title: string;
+      icon: any;
+      className: string;
+    }> = [];
+
+    // 1. Exams
+    dayExams.forEach((e) => {
+      allVisualItems.push({
+        id: `exam-${e.id}`,
+        type: 'exam',
+        title: e.title,
+        icon: FileText,
+        className: 'bg-rose-500/15 border-rose-500/30 text-rose-600 dark:text-rose-400 font-bold'
+      });
+    });
+
+    // 2. Exposiciones
+    dayCustomEvents
+      .filter((ev) => ev.type === 'exposicion')
+      .forEach((ev) => {
+        allVisualItems.push({
+          id: `expo-${ev.id}`,
+          type: 'exposicion',
+          title: ev.title,
+          icon: Mic,
+          className: 'bg-amber-500/15 border-amber-500/30 text-amber-600 dark:text-amber-400 font-bold'
+        });
+      });
+
+    // 3. Eventos
+    dayCustomEvents
+      .filter((ev) => ev.type === 'evento')
+      .forEach((ev) => {
+        allVisualItems.push({
+          id: `event-${ev.id}`,
+          type: 'evento',
+          title: ev.title,
+          icon: CalendarIcon,
+          className: 'bg-purple-500/15 border-purple-500/30 text-purple-600 dark:text-purple-400 font-bold'
+        });
+      });
+
+    // 4. Recordatorios
+    dayCustomEvents
+      .filter((ev) => ev.type === 'recordatorio')
+      .forEach((ev) => {
+        allVisualItems.push({
+          id: `rec-${ev.id}`,
+          type: 'recordatorio',
+          title: ev.title,
+          icon: Bell,
+          className: 'bg-cyan-500/15 border-cyan-500/30 text-cyan-600 dark:text-cyan-400 font-semibold'
+        });
+      });
+
+    // 5. Tasks
+    dayTasks.forEach((t) => {
+      const isDone = t.status === 'completada';
+      allVisualItems.push({
+        id: `task-${t.id}`,
+        type: 'task',
+        title: t.title,
+        icon: CheckSquare,
+        className: isDone
+          ? 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 line-through'
+          : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-600 dark:text-indigo-400 font-semibold'
+      });
+    });
+
+    // 6. Aggregated Study (ONE item for all sessions of this day)
+    if (totalStudyMinutes > 0) {
+      allVisualItems.push({
+        id: `study-total-${dateStr}`,
+        type: 'study',
+        title: `📚 Estudio · ${totalStudyMinutes} min`,
+        icon: Clock,
+        className: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 font-bold'
+      });
+    }
+
+    return {
+      allVisualItems,
+      totalCount: allVisualItems.length,
+      visibleItems: allVisualItems.slice(0, 3),
+      extraCount: Math.max(0, allVisualItems.length - 3)
+    };
   };
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -114,10 +216,7 @@ export const CalendarView: React.FC = () => {
           <GlassButton
             variant="primary"
             size="sm"
-            onClick={() => {
-              setSelectedDateForNewEvent(todayStr);
-              setIsEventModalOpen(true);
-            }}
+            onClick={() => handleOpenAddEventForDate(todayStr)}
             icon={<Plus className="w-4 h-4" />}
           >
             Nuevo Evento
@@ -125,7 +224,7 @@ export const CalendarView: React.FC = () => {
         </div>
       </div>
 
-      {/* Month Navigation Row & Full Legend */}
+      {/* Month Navigation Row & Categories Legend */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 rounded-2xl glass-panel border border-white/60 dark:border-white/10 shadow-sm">
         <div className="flex items-center gap-2">
           <button
@@ -164,7 +263,7 @@ export const CalendarView: React.FC = () => {
           </div>
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-slate-500">Estudio</span>
+            <span className="text-slate-500">Estudio Agrupado</span>
           </div>
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-purple-500" />
@@ -186,28 +285,35 @@ export const CalendarView: React.FC = () => {
         <GlassCard padding="none" className="overflow-hidden shadow-xl">
           {/* Days of week header */}
           <div className="grid grid-cols-7 border-b border-slate-200/60 dark:border-white/10 bg-slate-100/50 dark:bg-slate-900/50 text-center py-2.5 text-xs font-bold text-slate-500">
-            <span>Lun</span>
-            <span>Mar</span>
-            <span>Mié</span>
-            <span>Jue</span>
-            <span>Vie</span>
-            <span className="text-rose-500/80">Sáb</span>
-            <span className="text-rose-500/80">Dom</span>
+            <span className="hidden sm:inline">Lun</span>
+            <span className="sm:hidden">L</span>
+            <span className="hidden sm:inline">Mar</span>
+            <span className="sm:hidden">M</span>
+            <span className="hidden sm:inline">Mié</span>
+            <span className="sm:hidden">X</span>
+            <span className="hidden sm:inline">Jue</span>
+            <span className="sm:hidden">J</span>
+            <span className="hidden sm:inline">Vie</span>
+            <span className="sm:hidden">V</span>
+            <span className="text-rose-500/80 hidden sm:inline">Sáb</span>
+            <span className="text-rose-500/80 sm:hidden">S</span>
+            <span className="text-rose-500/80 hidden sm:inline">Dom</span>
+            <span className="text-rose-500/80 sm:hidden">D</span>
           </div>
 
-          {/* Grid Cells */}
-          <div className="grid grid-cols-7 auto-rows-fr divide-x divide-y divide-slate-200/40 dark:divide-white/5">
+          {/* Grid Cells (Uniform Height & Clean Layout) */}
+          <div className="grid grid-cols-7 divide-x divide-y divide-slate-200/40 dark:divide-white/5">
             {calendarCells.map((cell, index) => {
               if (!cell) {
                 return (
                   <div
                     key={`empty-${index}`}
-                    className="min-h-[105px] sm:min-h-[125px] bg-slate-100/20 dark:bg-slate-900/20"
+                    className="min-h-[100px] sm:min-h-[120px] bg-slate-100/20 dark:bg-slate-900/20"
                   />
                 );
               }
 
-              const { dayExams, dayTasks, daySessions, dayCustomEvents } = getItemsForDate(cell.dateStr);
+              const { visibleItems, extraCount } = getDayItems(cell.dateStr);
               const isToday = cell.dateStr === todayStr;
 
               return (
@@ -215,101 +321,63 @@ export const CalendarView: React.FC = () => {
                   key={cell.dateStr}
                   onClick={() => handleDayClick(cell.dateStr)}
                   className={`
-                    min-h-[105px] sm:min-h-[125px] p-2 transition-all cursor-pointer group hover:bg-indigo-50/40 dark:hover:bg-slate-800/40
+                    min-h-[100px] sm:min-h-[120px] max-h-[145px] p-1.5 sm:p-2 transition-all cursor-pointer group hover:bg-indigo-50/50 dark:hover:bg-slate-800/50 flex flex-col justify-between overflow-hidden
                     ${isToday ? 'bg-indigo-500/5' : ''}
                   `}
                 >
-                  <div className="flex items-center justify-between mb-1">
-                    <span
-                      className={`
-                        w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all
-                        ${
-                          isToday
-                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30'
-                            : 'text-slate-700 dark:text-slate-300 group-hover:text-indigo-600'
-                        }
-                      `}
-                    >
-                      {cell.dayNumber}
-                    </span>
+                  <div>
+                    {/* Day number & hover Add icon */}
+                    <div className="flex items-center justify-between mb-1">
+                      <span
+                        className={`
+                          w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all
+                          ${
+                            isToday
+                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30'
+                              : 'text-slate-700 dark:text-slate-300 group-hover:text-indigo-600'
+                          }
+                        `}
+                      >
+                        {cell.dayNumber}
+                      </span>
 
-                    <button className="opacity-0 group-hover:opacity-100 text-indigo-500 p-0.5 rounded hover:bg-indigo-100/50">
-                      <Plus className="w-3.5 h-3.5" />
-                    </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenAddEventForDate(cell.dateStr);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-indigo-500 p-0.5 rounded hover:bg-indigo-100/50 transition-opacity"
+                        title="Añadir evento a este día"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Max 3 visible items */}
+                    <div className="space-y-1">
+                      {visibleItems.map((item) => {
+                        const Icon = item.icon;
+                        return (
+                          <div
+                            key={item.id}
+                            className={`px-1.5 py-0.5 rounded-md border text-[10px] truncate flex items-center gap-1 ${item.className}`}
+                          >
+                            <Icon className="w-2.5 h-2.5 shrink-0" />
+                            <span className="truncate">{item.title}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {/* Badges / Events inside cell */}
-                  <div className="space-y-1 overflow-hidden">
-                    {/* Exams */}
-                    {dayExams.map((e) => (
-                      <div
-                        key={e.id}
-                        className="px-1.5 py-0.5 rounded-md bg-rose-500/15 border border-rose-500/30 text-rose-600 dark:text-rose-400 text-[10px] font-bold truncate flex items-center gap-1"
-                      >
-                        <FileText className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate">{e.title}</span>
-                      </div>
-                    ))}
-
-                    {/* Exposiciones */}
-                    {dayCustomEvents.filter(ev => ev.type === 'exposicion').map((ev) => (
-                      <div
-                        key={ev.id}
-                        className="px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] font-bold truncate flex items-center gap-1"
-                      >
-                        <Mic className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate">{ev.title}</span>
-                      </div>
-                    ))}
-
-                    {/* Eventos / Vacaciones */}
-                    {dayCustomEvents.filter(ev => ev.type === 'evento').map((ev) => (
-                      <div
-                        key={ev.id}
-                        className="px-1.5 py-0.5 rounded-md bg-purple-500/15 border border-purple-500/30 text-purple-600 dark:text-purple-400 text-[10px] font-bold truncate flex items-center gap-1"
-                      >
-                        <CalendarIcon className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate">{ev.title}</span>
-                      </div>
-                    ))}
-
-                    {/* Recordatorios */}
-                    {dayCustomEvents.filter(ev => ev.type === 'recordatorio').map((ev) => (
-                      <div
-                        key={ev.id}
-                        className="px-1.5 py-0.5 rounded-md bg-cyan-500/15 border border-cyan-500/30 text-cyan-600 dark:text-cyan-400 text-[10px] font-semibold truncate flex items-center gap-1"
-                      >
-                        <Bell className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate">{ev.title}</span>
-                      </div>
-                    ))}
-
-                    {/* Tasks */}
-                    {dayTasks.map((t) => (
-                      <div
-                        key={t.id}
-                        className={`px-1.5 py-0.5 rounded-md text-[10px] font-medium truncate flex items-center gap-1 ${
-                          t.status === 'completada'
-                            ? 'bg-slate-200/50 dark:bg-slate-800/50 text-slate-400 line-through'
-                            : 'bg-indigo-500/15 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400 font-semibold'
-                        }`}
-                      >
-                        <CheckSquare className="w-2.5 h-2.5 shrink-0" />
-                        <span className="truncate">{t.title}</span>
-                      </div>
-                    ))}
-
-                    {/* Focus Sessions */}
-                    {daySessions.map((s) => (
-                      <div
-                        key={s.id}
-                        className="px-1.5 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-medium truncate flex items-center gap-1"
-                      >
-                        <Clock className="w-2.5 h-2.5 shrink-0" />
-                        <span>{s.durationMinutes}m estudio</span>
-                      </div>
-                    ))}
-                  </div>
+                  {/* "+X más" Badge if more than 3 items */}
+                  {extraCount > 0 && (
+                    <div className="mt-1 text-right">
+                      <span className="inline-block px-1.5 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 hover:text-indigo-600 transition-colors">
+                        +{extraCount} más
+                      </span>
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -326,13 +394,19 @@ export const CalendarView: React.FC = () => {
           <div className="space-y-3">
             {/* Custom Events */}
             {customEvents.map((ev) => {
-              const typeColor = ev.type === 'evento' ? 'bg-purple-500' : ev.type === 'exposicion' ? 'bg-amber-500' : 'bg-cyan-500';
+              const typeColor =
+                ev.type === 'evento'
+                  ? 'bg-purple-500'
+                  : ev.type === 'exposicion'
+                  ? 'bg-amber-500'
+                  : 'bg-cyan-500';
               const Icon = ev.type === 'evento' ? CalendarIcon : ev.type === 'exposicion' ? Mic : Bell;
 
               return (
                 <div
                   key={ev.id}
-                  className="p-3.5 rounded-2xl bg-white/50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-3"
+                  onClick={() => handleDayClick(ev.date)}
+                  className="p-3.5 rounded-2xl bg-white/50 dark:bg-slate-900/50 border border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-3 cursor-pointer hover:border-indigo-300 transition-all"
                 >
                   <div className="flex items-center gap-3">
                     <div className={`p-2.5 rounded-xl text-white ${typeColor}`}>
@@ -358,7 +432,10 @@ export const CalendarView: React.FC = () => {
                       {ev.date} {ev.time && `• ${ev.time}`}
                     </span>
                     <button
-                      onClick={() => deleteCustomEvent(ev.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteCustomEvent(ev.id);
+                      }}
                       className="p-1.5 rounded-lg text-slate-400 hover:text-rose-500"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -372,7 +449,8 @@ export const CalendarView: React.FC = () => {
             {exams.map((e) => (
               <div
                 key={e.id}
-                className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between"
+                onClick={() => handleDayClick(e.date)}
+                className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex items-center justify-between cursor-pointer hover:border-rose-400 transition-all"
               >
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-xl bg-rose-500 text-white">
@@ -395,7 +473,8 @@ export const CalendarView: React.FC = () => {
             {tasks.map((t) => (
               <div
                 key={t.id}
-                className="p-3.5 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 flex items-center justify-between"
+                onClick={() => handleDayClick(t.dueDate)}
+                className="p-3.5 rounded-2xl bg-white/40 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 flex items-center justify-between cursor-pointer hover:border-indigo-300 transition-all"
               >
                 <div className="flex items-center gap-3">
                   <div className="p-2.5 rounded-xl bg-indigo-500 text-white">
@@ -412,11 +491,19 @@ export const CalendarView: React.FC = () => {
         </GlassCard>
       )}
 
-      {/* Modal */}
+      {/* Creation Event Modal */}
       <EventModal
         isOpen={isEventModalOpen}
         onClose={() => setIsEventModalOpen(false)}
         initialDate={selectedDateForNewEvent}
+      />
+
+      {/* Day Detailed View Modal */}
+      <DayDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={() => setIsDetailModalOpen(false)}
+        dateStr={selectedDateForDetail}
+        onAddEvent={(d) => handleOpenAddEventForDate(d)}
       />
     </div>
   );
