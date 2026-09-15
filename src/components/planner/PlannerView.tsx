@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StudyPlan, StudyPlanMilestone } from '../../types';
 import { GlassCard } from '../ui/GlassCard';
@@ -131,14 +131,14 @@ export const PlannerView: React.FC = () => {
     });
 
     addStudyPlan({
-      examId: selectedExamId || undefined,
       subjectId: selectedSubjectId,
       title: planTitle,
       examDate,
       difficulty,
       dailyStudyMinutes: dailyMinutes,
       topics: topicsList,
-      milestones
+      milestones,
+      ...(selectedExamId ? { examId: selectedExamId } : {})
     });
 
     confetti({ particleCount: 50, spread: 60 });

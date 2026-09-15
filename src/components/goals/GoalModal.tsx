@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Goal, GoalType } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { GlassModal } from '../ui/GlassModal';
@@ -70,17 +70,19 @@ export const GoalModal: React.FC<GoalModalProps> = ({
     e.preventDefault();
     if (!title.trim()) return;
 
-    onSubmit({
+    const goalData: Omit<Goal, 'id'> = {
       title: title.trim(),
-      description: description.trim() || undefined,
       type,
       targetValue: Number(targetValue),
       currentValue: Number(currentValue),
       unit,
-      subjectId: subjectId || undefined,
-      deadline: deadline || undefined,
-      completed: Number(currentValue) >= Number(targetValue)
-    });
+      completed: Number(currentValue) >= Number(targetValue),
+      ...(description.trim() ? { description: description.trim() } : {}),
+      ...(subjectId ? { subjectId } : {}),
+      ...(deadline ? { deadline } : {})
+    };
+
+    onSubmit(goalData);
     onClose();
   };
 

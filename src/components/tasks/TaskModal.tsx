@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Task, Priority, TaskStatus } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { GlassModal } from '../ui/GlassModal';
@@ -54,16 +54,18 @@ export const TaskModal: React.FC<TaskModalProps> = ({
     e.preventDefault();
     if (!title.trim()) return;
 
-    onSubmit({
+    const taskData: Omit<Task, 'id' | 'createdAt'> = {
       title: title.trim(),
-      description: description.trim() || undefined,
-      subjectId: subjectId || undefined,
       dueDate,
-      dueTime: dueTime || undefined,
       priority,
       status,
-      estimatedMinutes: Number(estimatedMinutes)
-    });
+      estimatedMinutes: Number(estimatedMinutes),
+      ...(description.trim() ? { description: description.trim() } : {}),
+      ...(subjectId ? { subjectId } : {}),
+      ...(dueTime ? { dueTime } : {})
+    };
+
+    onSubmit(taskData);
     onClose();
   };
 

@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Task, Priority } from '../../types';
 import { GlassCard } from '../ui/GlassCard';
@@ -48,10 +48,10 @@ export const TasksView: React.FC = () => {
     if (!quickTitle.trim()) return;
     addTask({
       title: quickTitle.trim(),
-      subjectId: quickSubject || undefined,
       dueDate: todayStr,
       priority: 'media',
-      status: 'pendiente'
+      status: 'pendiente',
+      ...(quickSubject ? { subjectId: quickSubject } : {})
     });
     setQuickTitle('');
   };

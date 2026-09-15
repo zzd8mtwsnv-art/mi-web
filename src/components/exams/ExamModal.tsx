@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Exam } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { GlassModal } from '../ui/GlassModal';
@@ -63,19 +63,21 @@ export const ExamModal: React.FC<ExamModalProps> = ({
     e.preventDefault();
     if (!title.trim() || !subjectId) return;
 
-    onSubmit({
+    const examData: Omit<Exam, 'id'> = {
       title: title.trim(),
       subjectId,
       date,
-      time: time || undefined,
-      classroom: classroom.trim() || undefined,
-      topics: topics.trim() || undefined,
       importance,
-      grade: grade !== '' ? Number(grade) : undefined,
       maxGrade: Number(maxGrade),
       weightPercentage: Number(weightPercentage),
-      notes: notes.trim() || undefined
-    });
+      ...(time ? { time } : {}),
+      ...(classroom.trim() ? { classroom: classroom.trim() } : {}),
+      ...(topics.trim() ? { topics: topics.trim() } : {}),
+      ...(grade !== '' ? { grade: Number(grade) } : {}),
+      ...(notes.trim() ? { notes: notes.trim() } : {})
+    };
+
+    onSubmit(examData);
     onClose();
   };
 

@@ -53,10 +53,10 @@ export const QuickAddModal: React.FC = () => {
     if (!taskTitle.trim()) return;
     addTask({
       title: taskTitle.trim(),
-      subjectId: taskSubjectId || undefined,
       dueDate: taskDueDate,
       priority: taskPriority,
-      status: 'pendiente'
+      status: 'pendiente',
+      ...(taskSubjectId ? { subjectId: taskSubjectId } : {})
     });
     setTaskTitle('');
     setIsQuickAddOpen(false);
@@ -83,9 +83,9 @@ export const QuickAddModal: React.FC = () => {
       type: eventType,
       date: eventDate,
       time: eventTime,
-      subjectId: eventSubjectId || undefined,
       color: eventType === 'evento' ? '#8B5CF6' : eventType === 'exposicion' ? '#F59E0B' : '#06B6D4',
-      completed: false
+      completed: false,
+      ...(eventSubjectId ? { subjectId: eventSubjectId } : {})
     });
     setEventTitle('');
     setIsQuickAddOpen(false);
@@ -98,7 +98,7 @@ export const QuickAddModal: React.FC = () => {
       name: subName.trim(),
       color: subColor,
       icon: 'BookOpen',
-      teacher: subTeacher.trim() || undefined
+      ...(subTeacher.trim() ? { teacher: subTeacher.trim() } : {})
     });
     setSubName('');
     setIsQuickAddOpen(false);
@@ -107,12 +107,12 @@ export const QuickAddModal: React.FC = () => {
   const handleCreateSession = (e: React.FormEvent) => {
     e.preventDefault();
     addFocusSession({
-      subjectId: sessionSubjectId || undefined,
       durationMinutes: Number(sessionMins),
       type: 'normal',
       date: new Date().toISOString(),
       completed: true,
-      notes: 'Sesión registrada manualmente'
+      notes: 'Sesión registrada manualmente',
+      ...(sessionSubjectId ? { subjectId: sessionSubjectId } : {})
     });
     setIsQuickAddOpen(false);
   };

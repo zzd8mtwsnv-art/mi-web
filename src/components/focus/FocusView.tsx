@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../ui/GlassCard';
 import { GlassButton } from '../ui/GlassButton';
@@ -124,12 +124,12 @@ export const FocusView: React.FC = () => {
     if (mode === 'pomodoro') {
       const studiedMins = settings.pomodoroWorkMinutes;
       addFocusSession({
-        subjectId: selectedSubjectId || undefined,
         durationMinutes: studiedMins,
         type: 'pomodoro',
         date: new Date().toISOString(),
         completed: true,
-        notes: `Bloque Pomodoro (${studiedMins} min)`
+        notes: `Bloque Pomodoro (${studiedMins} min)`,
+        ...(selectedSubjectId ? { subjectId: selectedSubjectId } : {})
       });
 
       const nextCount = pomodoroCount + 1;
@@ -152,12 +152,12 @@ export const FocusView: React.FC = () => {
 
     if (elapsedMinutes >= 1 && (mode === 'pomodoro' || mode === 'stopwatch')) {
       addFocusSession({
-        subjectId: selectedSubjectId || undefined,
         durationMinutes: elapsedMinutes,
         type: mode === 'pomodoro' ? 'pomodoro' : 'normal',
         date: new Date().toISOString(),
         completed: true,
-        notes: `Sesión de ${elapsedMinutes} minutos`
+        notes: `Sesión de ${elapsedMinutes} minutos`,
+        ...(selectedSubjectId ? { subjectId: selectedSubjectId } : {})
       });
 
       confetti({ particleCount: 50, spread: 60 });

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Subject } from '../../types';
 import { GlassModal } from '../ui/GlassModal';
 import { GlassButton } from '../ui/GlassButton';
@@ -52,16 +52,18 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
     e.preventDefault();
     if (!name.trim()) return;
 
-    onSubmit({
+    const subjectData: Omit<Subject, 'id'> = {
       name: name.trim(),
-      shortName: shortName.trim() || undefined,
       color,
       icon,
-      teacher: teacher.trim() || undefined,
-      classroom: classroom.trim() || undefined,
       targetGrade: Number(targetGrade),
-      notes: notes.trim() || undefined
-    });
+      ...(shortName.trim() ? { shortName: shortName.trim() } : {}),
+      ...(teacher.trim() ? { teacher: teacher.trim() } : {}),
+      ...(classroom.trim() ? { classroom: classroom.trim() } : {}),
+      ...(notes.trim() ? { notes: notes.trim() } : {})
+    };
+
+    onSubmit(subjectData);
     onClose();
   };
 

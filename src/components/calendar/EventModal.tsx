@@ -4,6 +4,7 @@ import { GlassModal } from '../ui/GlassModal';
 import { GlassButton } from '../ui/GlassButton';
 import { getTodayDateString } from '../../utils/dateUtils';
 import { CheckSquare, FileText, Clock, Sparkles, Mic, Bell, Calendar as CalendarIcon } from 'lucide-react';
+import { Task, Exam, FocusSession, CustomEvent } from '../../types';
 
 interface EventModalProps {
   isOpen: boolean;
@@ -30,44 +31,48 @@ export const EventModal: React.FC<EventModalProps> = ({
     if (!title.trim()) return;
 
     if (eventType === 'task') {
-      addTask({
+      const taskData: Omit<Task, 'id' | 'createdAt'> = {
         title: title.trim(),
-        description: description.trim() || undefined,
-        subjectId: subjectId || undefined,
         dueDate: date,
-        dueTime: time,
         priority: 'media',
-        status: 'pendiente'
-      });
+        status: 'pendiente',
+        ...(description.trim() ? { description: description.trim() } : {}),
+        ...(subjectId ? { subjectId } : {}),
+        ...(time ? { dueTime: time } : {})
+      };
+      addTask(taskData);
     } else if (eventType === 'exam') {
-      addExam({
+      const examData: Omit<Exam, 'id'> = {
         title: title.trim(),
         subjectId,
         date,
-        time,
-        topics: description.trim() || undefined,
-        importance: 'alta'
-      });
+        importance: 'alta',
+        ...(time ? { time } : {}),
+        ...(description.trim() ? { topics: description.trim() } : {})
+      };
+      addExam(examData);
     } else if (eventType === 'session') {
-      addFocusSession({
-        subjectId: subjectId || undefined,
+      const sessionData: Omit<FocusSession, 'id'> = {
         durationMinutes: minutes,
         type: 'normal',
-        date: new Date(`${date}T${time}:00`).toISOString(),
+        date: new Date(`${date}T${time || '10:00'}:00`).toISOString(),
         completed: true,
-        notes: title.trim()
-      });
+        notes: title.trim(),
+        ...(subjectId ? { subjectId } : {})
+      };
+      addFocusSession(sessionData);
     } else if (eventType === 'evento' || eventType === 'exposicion' || eventType === 'recordatorio') {
-      addCustomEvent({
+      const eventData: Omit<CustomEvent, 'id' | 'createdAt'> = {
         title: title.trim(),
-        description: description.trim() || undefined,
         type: eventType,
         date,
-        time: time || undefined,
-        subjectId: subjectId || undefined,
         color: eventType === 'evento' ? '#8B5CF6' : eventType === 'exposicion' ? '#F59E0B' : '#06B6D4',
-        completed: false
-      });
+        completed: false,
+        ...(description.trim() ? { description: description.trim() } : {}),
+        ...(time ? { time } : {}),
+        ...(subjectId ? { subjectId } : {})
+      };
+      addCustomEvent(eventData);
     }
 
     setTitle('');

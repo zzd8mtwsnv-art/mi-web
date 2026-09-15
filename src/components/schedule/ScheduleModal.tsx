@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScheduleItem } from '../../types';
 import { useApp } from '../../context/AppContext';
 import { GlassModal } from '../ui/GlassModal';
@@ -49,14 +49,16 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
     e.preventDefault();
     if (!subjectId) return;
 
-    onSubmit({
+    const scheduleData: Omit<ScheduleItem, 'id'> = {
       subjectId,
       dayOfWeek,
       startTime,
       endTime,
-      classroom: classroom.trim() || undefined,
-      teacher: teacher.trim() || undefined
-    });
+      ...(classroom.trim() ? { classroom: classroom.trim() } : {}),
+      ...(teacher.trim() ? { teacher: teacher.trim() } : {})
+    };
+
+    onSubmit(scheduleData);
     onClose();
   };
 

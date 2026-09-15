@@ -68,6 +68,58 @@ export const fetchCloudData = async (userId: string): Promise<CloudStudyData | n
 };
 
 /**
+ * Recursively removes all `undefined` fields from objects and arrays.
+ * Preserves `false`, `0`, `""`, `null`, `Date`, and special objects.
+ * Accurately tracks removed undefined properties for logging.
+ */
+export function removeUndefinedDeep<T>(value: T, stats = { removedCount: 0 }): T {
+  if (value === null || value === undefined) {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return value;
+  }
+
+  if (Array.isArray(value)) {
+    const cleanedArray: any[] = [];
+    for (const item of value) {
+      if (item === undefined) {
+        stats.removedCount++;
+      } else {
+        cleanedArray.push(removeUndefinedDeep(item, stats));
+      }
+    }
+    return cleanedArray as unknown as T;
+  }
+
+  if (typeof value === 'object') {
+    // Check if it is a plain object or custom prototype (e.g. Firebase Timestamp / FieldValue)
+    const proto = Object.getPrototypeOf(value);
+    if (proto !== null && proto !== Object.prototype) {
+      return value;
+    }
+
+    const cleaned: Record<string, any> = {};
+    for (const [key, val] of Object.entries(value as Record<string, any>)) {
+      if (val === undefined) {
+        stats.removedCount++;
+      } else {
+        const cleanedVal = removeUndefinedDeep(val, stats);
+        if (cleanedVal === undefined) {
+          stats.removedCount++;
+        } else {
+          cleaned[key] = cleanedVal;
+        }
+      }
+    }
+    return cleaned as T;
+  }
+
+  return value;
+}
+
+/**
  * Saves study data to Firestore `users/{userId}/data/main`
  */
 export const saveCloudData = async (
@@ -97,17 +149,16 @@ export const saveCloudData = async (
       userRef,
       {
         uid: userId,
-        email: userMeta?.email || null,
-        displayName: userMeta?.displayName || null,
-        photoURL: userMeta?.photoURL || null,
+        email: userMeta?.email ?? null,
+        displayName: userMeta?.displayName ?? null,
+        photoURL: userMeta?.photoURL ?? null,
         updatedAt: serverTimestamp()
       },
       { merge: true }
     );
 
-    // 2. Update main study data document
-    const dataRef = doc(db, 'users', userId, 'data', 'main');
-    await setDoc(dataRef, {
+    // 2. Prepare and sanitize payload for users/{userId}/data/main
+    const rawPayload = {
       subjects: data.subjects ?? [],
       tasks: data.tasks ?? [],
       exams: data.exams ?? [],
@@ -121,7 +172,19 @@ export const saveCloudData = async (
       settings: data.settings,
       streakRecord: data.streakRecord ?? 0,
       lastSync: new Date().toISOString()
-    });
+    };
+
+    const stats = { removedCount: 0 };
+    const sanitizedPayload = removeUndefinedDeep(rawPayload, stats);
+
+    if (stats.removedCount > 0) {
+      console.warn(`[StudyFlow CloudSync] 🧹 removeUndefinedDeep eliminó ${stats.removedCount} propiedad(es) con valor 'undefined' antes de guardar en Firestore.`);
+    } else {
+      console.log(`[StudyFlow CloudSync] ✨ removeUndefinedDeep: payload 100% limpio (0 valores undefined detectados).`);
+    }
+
+    const dataRef = doc(db, 'users', userId, 'data', 'main');
+    await setDoc(dataRef, sanitizedPayload);
 
     console.log(`[StudyFlow CloudSync] ✅ Firestore confirmó la escritura exitosa para UID: ${userId}`);
     return true;

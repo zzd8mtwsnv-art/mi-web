@@ -217,10 +217,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         name: authUser.displayName || authUser.email?.split('@')[0] || 'Estudiante',
         gradeLevel: settings.gradeLevel || '2º Bachillerato',
         avatarColor: '#6366F1',
-        email: authUser.email || undefined,
-        photoURL: authUser.photoURL || undefined,
         createdAt: new Date().toISOString(),
-        isDemo: authUser.providerId === 'demo'
+        isDemo: authUser.providerId === 'demo',
+        ...(authUser.email ? { email: authUser.email } : {}),
+        ...(authUser.photoURL ? { photoURL: authUser.photoURL } : {})
       }
     : profiles.find((p) => p.id === currentUserId) || null;
 
@@ -709,11 +709,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } else {
             soundManager.playClick();
           }
-          return {
+          const updated: Task = {
             ...t,
-            status: newStatus,
-            completedAt: !isCompleted ? new Date().toISOString() : undefined
+            status: newStatus
           };
+          if (!isCompleted) {
+            updated.completedAt = new Date().toISOString();
+          } else {
+            delete updated.completedAt;
+          }
+          return updated;
         }
         return t;
       })
