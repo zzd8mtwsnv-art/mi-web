@@ -1,78 +1,128 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GlassModal } from '../ui/GlassModal';
 import { GlassButton } from '../ui/GlassButton';
 import { getTodayDateString } from '../../utils/dateUtils';
 import { CheckSquare, FileText, Clock, Sparkles, Mic, Bell, Calendar as CalendarIcon } from 'lucide-react';
-import { Task, Exam, FocusSession, CustomEvent } from '../../types';
+import { Task, Exam, FocusSession, CustomEvent, CustomEventType } from '../../types';
 
 interface EventModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialDate?: string;
+  initialCustomEvent?: CustomEvent | null;
 }
 
 export const EventModal: React.FC<EventModalProps> = ({
   isOpen,
   onClose,
-  initialDate
+  initialDate,
+  initialCustomEvent
 }) => {
-  const { subjects, addTask, addExam, addFocusSession, addCustomEvent } = useApp();
+  const { subjects, addTask, addExam, addFocusSession, addCustomEvent, updateCustomEvent } = useApp();
   const [eventType, setEventType] = useState<'task' | 'exam' | 'session' | 'evento' | 'exposicion' | 'recordatorio'>('task');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [subjectId, setSubjectId] = useState(subjects[0]?.id || '');
   const [date, setDate] = useState(initialDate || getTodayDateString());
+  const [hasTime, setHasTime] = useState<boolean>(false);
   const [time, setTime] = useState('10:00');
   const [minutes, setMinutes] = useState(45);
+
+  useEffect(() => {
+    if (initialCustomEvent) {
+      setEventType(initialCustomEvent.type);
+      setTitle(initialCustomEvent.title);
+      setDescription(initialCustomEvent.description || '');
+      setSubjectId(initialCustomEvent.subjectId || '');
+      setDate(initialCustomEvent.date);
+      if (initialCustomEvent.time) {
+        setHasTime(true);
+        setTime(initialCustomEvent.time);
+      } else {
+        setHasTime(false);
+        setTime('10:00');
+      }
+    } else {
+      setEventType('task');
+      setTitle('');
+      setDescription('');
+      setSubjectId(subjects[0]?.id || '');
+      setDate(initialDate || getTodayDateString());
+      setHasTime(false);
+      setTime('10:00');
+      setMinutes(45);
+    }
+  }, [initialCustomEvent, initialDate, isOpen, subjects]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) return;
 
-    if (eventType === 'task') {
-      const taskData: Omit<Task, 'id' | 'createdAt'> = {
+    if (initialCustomEvent) {
+      // Editing existing CustomEvent
+      const updateData: Partial<CustomEvent> = {
         title: title.trim(),
-        dueDate: date,
-        priority: 'media',
-        status: 'pendiente',
-        ...(description.trim() ? { description: description.trim() } : {}),
-        ...(subjectId ? { subjectId } : {}),
-        ...(time ? { dueTime: time } : {})
-      };
-      addTask(taskData);
-    } else if (eventType === 'exam') {
-      const examData: Omit<Exam, 'id'> = {
-        title: title.trim(),
-        subjectId,
-        date,
-        importance: 'alta',
-        ...(time ? { time } : {}),
-        ...(description.trim() ? { topics: description.trim() } : {})
-      };
-      addExam(examData);
-    } else if (eventType === 'session') {
-      const sessionData: Omit<FocusSession, 'id'> = {
-        durationMinutes: minutes,
-        type: 'normal',
-        date: new Date(`${date}T${time || '10:00'}:00`).toISOString(),
-        completed: true,
-        notes: title.trim(),
-        ...(subjectId ? { subjectId } : {})
-      };
-      addFocusSession(sessionData);
-    } else if (eventType === 'evento' || eventType === 'exposicion' || eventType === 'recordatorio') {
-      const eventData: Omit<CustomEvent, 'id' | 'createdAt'> = {
-        title: title.trim(),
-        type: eventType,
+        type: eventType as CustomEventType,
         date,
         color: eventType === 'evento' ? '#8B5CF6' : eventType === 'exposicion' ? '#F59E0B' : '#06B6D4',
-        completed: false,
         ...(description.trim() ? { description: description.trim() } : {}),
-        ...(time ? { time } : {}),
-        ...(subjectId ? { subjectId } : {})
+        ...(subjectId ? { subjectId } : {}),
+        ...(hasTime && time ? { time: time.trim() } : {})
       };
-      addCustomEvent(eventData);
+
+      // If had time before and now hasTime is false, explicitly delete the time from the object
+      if (!hasTime) {
+        delete updateData.time;
+      }
+
+      updateCustomEvent(initialCustomEvent.id, updateData);
+    } else {
+      // Creating new entry
+      if (eventType === 'task') {
+        const taskData: Omit<Task, 'id' | 'createdAt'> = {
+          title: title.trim(),
+          dueDate: date,
+          priority: 'media',
+          status: 'pendiente',
+          ...(description.trim() ? { description: description.trim() } : {}),
+          ...(subjectId ? { subjectId } : {}),
+          ...(hasTime && time ? { dueTime: time.trim() } : {})
+        };
+        addTask(taskData);
+      } else if (eventType === 'exam') {
+        const examData: Omit<Exam, 'id'> = {
+          title: title.trim(),
+          subjectId: subjectId || subjects[0]?.id || 'general',
+          date,
+          importance: 'alta',
+          ...(hasTime && time ? { time: time.trim() } : {}),
+          ...(description.trim() ? { topics: description.trim(), notes: description.trim() } : {})
+        };
+        addExam(examData);
+      } else if (eventType === 'session') {
+        const sessionData: Omit<FocusSession, 'id'> = {
+          durationMinutes: minutes,
+          type: 'normal',
+          date: new Date(`${date}T${hasTime && time ? time : '10:00'}:00`).toISOString(),
+          completed: true,
+          notes: title.trim() || (description.trim() || undefined),
+          ...(subjectId ? { subjectId } : {})
+        };
+        addFocusSession(sessionData);
+      } else if (eventType === 'evento' || eventType === 'exposicion' || eventType === 'recordatorio') {
+        const eventData: Omit<CustomEvent, 'id' | 'createdAt'> = {
+          title: title.trim(),
+          type: eventType,
+          date,
+          color: eventType === 'evento' ? '#8B5CF6' : eventType === 'exposicion' ? '#F59E0B' : '#06B6D4',
+          completed: false,
+          ...(description.trim() ? { description: description.trim() } : {}),
+          ...(hasTime && time ? { time: time.trim() } : {}),
+          ...(subjectId ? { subjectId } : {})
+        };
+        addCustomEvent(eventData);
+      }
     }
 
     setTitle('');
@@ -84,8 +134,8 @@ export const EventModal: React.FC<EventModalProps> = ({
     <GlassModal
       isOpen={isOpen}
       onClose={onClose}
-      title="Nuevo Evento en Calendario"
-      subtitle="Programa exámenes, tareas, eventos, exposiciones o recordatorios"
+      title={initialCustomEvent ? 'Editar Evento' : 'Nuevo Evento en Calendario'}
+      subtitle={initialCustomEvent ? 'Modifica los detalles del evento' : 'Programa exámenes, tareas, eventos, exposiciones o recordatorios'}
       maxWidth="lg"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -180,35 +230,47 @@ export const EventModal: React.FC<EventModalProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Hora
+        {/* Optional Time Toggle & Input */}
+        <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 cursor-pointer select-none">
+              <Clock className="w-3.5 h-3.5 text-indigo-500" /> ¿Añadir hora?
             </label>
             <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="w-full px-3 py-2.5 rounded-2xl glass-input text-sm"
+              type="checkbox"
+              checked={hasTime}
+              onChange={(e) => setHasTime(e.target.checked)}
+              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
             />
           </div>
 
-          {eventType === 'session' && (
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Duración (min)
-              </label>
+          {hasTime && (
+            <div className="pt-1">
               <input
-                type="number"
-                min="10"
-                max="300"
-                value={minutes}
-                onChange={(e) => setMinutes(Number(e.target.value))}
-                className="w-full px-3 py-2.5 rounded-2xl glass-input text-sm"
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl glass-input text-sm font-semibold"
               />
             </div>
           )}
         </div>
+
+        {eventType === 'session' && (
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Duración (minutos)
+            </label>
+            <input
+              type="number"
+              min="5"
+              max="360"
+              value={minutes}
+              onChange={(e) => setMinutes(Number(e.target.value))}
+              className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm"
+            />
+          </div>
+        )}
 
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
@@ -219,7 +281,7 @@ export const EventModal: React.FC<EventModalProps> = ({
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Anotaciones, requisitos de la exposición, material necesario..."
-            className="w-full px-3.5 py-2 rounded-2xl glass-input text-sm"
+            className="w-full px-3.5 py-2 rounded-2xl glass-input text-sm resize-none"
           />
         </div>
 
@@ -228,7 +290,7 @@ export const EventModal: React.FC<EventModalProps> = ({
             Cancelar
           </GlassButton>
           <GlassButton variant="primary" type="submit">
-            Guardar en Calendario
+            {initialCustomEvent ? 'Guardar Cambios' : 'Guardar en Calendario'}
           </GlassButton>
         </div>
       </form>

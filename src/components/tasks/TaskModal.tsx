@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { GlassModal } from '../ui/GlassModal';
 import { GlassButton } from '../ui/GlassButton';
 import { getTodayDateString } from '../../utils/dateUtils';
+import { Clock } from 'lucide-react';
 
 interface TaskModalProps {
   isOpen: boolean;
@@ -23,7 +24,8 @@ export const TaskModal: React.FC<TaskModalProps> = ({
   const [description, setDescription] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [dueDate, setDueDate] = useState(getTodayDateString());
-  const [dueTime, setDueTime] = useState('');
+  const [hasTime, setHasTime] = useState<boolean>(false);
+  const [dueTime, setDueTime] = useState('18:00');
   const [priority, setPriority] = useState<Priority>('media');
   const [status, setStatus] = useState<TaskStatus>('pendiente');
   const [estimatedMinutes, setEstimatedMinutes] = useState<number>(45);
@@ -34,7 +36,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setDescription(initialData.description || '');
       setSubjectId(initialData.subjectId || '');
       setDueDate(initialData.dueDate);
-      setDueTime(initialData.dueTime || '');
+      if (initialData.dueTime) {
+        setHasTime(true);
+        setDueTime(initialData.dueTime);
+      } else {
+        setHasTime(false);
+        setDueTime('18:00');
+      }
       setPriority(initialData.priority);
       setStatus(initialData.status);
       setEstimatedMinutes(initialData.estimatedMinutes || 45);
@@ -43,6 +51,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       setDescription('');
       setSubjectId(subjects[0]?.id || '');
       setDueDate(getTodayDateString());
+      setHasTime(false);
       setDueTime('18:00');
       setPriority('media');
       setStatus('pendiente');
@@ -62,7 +71,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
       estimatedMinutes: Number(estimatedMinutes),
       ...(description.trim() ? { description: description.trim() } : {}),
       ...(subjectId ? { subjectId } : {}),
-      ...(dueTime ? { dueTime } : {})
+      ...(hasTime && dueTime ? { dueTime: dueTime.trim() } : {})
     };
 
     onSubmit(taskData);
@@ -126,6 +135,32 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           </div>
         </div>
 
+        {/* Optional Time Toggle & Input */}
+        <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 cursor-pointer select-none">
+              <Clock className="w-3.5 h-3.5 text-indigo-500" /> ¿Añadir hora límite?
+            </label>
+            <input
+              type="checkbox"
+              checked={hasTime}
+              onChange={(e) => setHasTime(e.target.checked)}
+              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+            />
+          </div>
+
+          {hasTime && (
+            <div className="pt-1">
+              <input
+                type="time"
+                value={dueTime}
+                onChange={(e) => setDueTime(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl glass-input text-sm font-semibold"
+              />
+            </div>
+          )}
+        </div>
+
         {/* Priority Selector */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">
@@ -170,13 +205,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 key={st}
                 type="button"
                 onClick={() => setStatus(st)}
-                className={`py-1.5 text-xs font-semibold rounded-xl border transition-all ${
+                className={`py-2 text-xs font-semibold rounded-xl border capitalize transition-all ${
                   status === st
-                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-sm'
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-transparent shadow-md'
                     : 'bg-white/40 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 border-slate-200/60 dark:border-white/10'
                 }`}
               >
-                {st === 'pendiente' ? 'Pendiente' : st === 'en_progreso' ? 'En Curso' : 'Hecha'}
+                {st.replace('_', ' ')}
               </button>
             ))}
           </div>
@@ -185,22 +220,23 @@ export const TaskModal: React.FC<TaskModalProps> = ({
         {/* Description */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-            Detalles o Instrucciones
+            Descripción o Detalles
           </label>
           <textarea
             rows={3}
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Instrucciones del profesor, páginas del libro, requisitos..."
-            className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm"
+            placeholder="Instrucciones del profesor, páginas del libro, enlaces de entrega..."
+            className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm resize-none"
           />
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200/60 dark:border-white/10">
-          <GlassButton variant="secondary" type="button" onClick={onClose}>
+        {/* Form Actions */}
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <GlassButton type="button" variant="ghost" size="sm" onClick={onClose}>
             Cancelar
           </GlassButton>
-          <GlassButton variant="primary" type="submit">
+          <GlassButton type="submit" variant="primary" size="sm">
             {initialData ? 'Guardar Cambios' : 'Crear Tarea'}
           </GlassButton>
         </div>

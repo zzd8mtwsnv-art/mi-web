@@ -1,10 +1,11 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Exam } from '../../types';
 import { GlassCard } from '../ui/GlassCard';
 import { GlassBadge } from '../ui/GlassBadge';
 import { GlassButton } from '../ui/GlassButton';
 import { ExamModal } from './ExamModal';
+import { ItemDetailModal } from '../common/ItemDetailModal';
 import { getRelativeDayString } from '../../utils/dateUtils';
 import {
   Plus,
@@ -22,6 +23,7 @@ export const ExamsView: React.FC = () => {
   const { exams, subjects, addExam, updateExam, deleteExam, setActiveView } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingExam, setEditingExam] = useState<Exam | null>(null);
+  const [selectedDetailExam, setSelectedDetailExam] = useState<Exam | null>(null);
 
   const handleOpenAdd = () => {
     setEditingExam(null);
@@ -105,7 +107,8 @@ export const ExamsView: React.FC = () => {
                 <GlassCard
                   key={exam.id}
                   padding="md"
-                  className="flex flex-col justify-between group relative overflow-hidden border-rose-500/20 hover:border-rose-500/40 transition-all shadow-md"
+                  onClick={() => setSelectedDetailExam(exam)}
+                  className="flex flex-col justify-between group relative overflow-hidden border-rose-500/20 hover:border-rose-500/40 transition-all shadow-md cursor-pointer"
                 >
                   <div>
                     {/* Top row: Subject pill + Countdown badge */}
@@ -135,7 +138,7 @@ export const ExamsView: React.FC = () => {
                     </h3>
 
                     {exam.topics && (
-                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed bg-white/40 dark:bg-slate-900/40 p-2.5 rounded-xl border border-slate-200/40 dark:border-white/5">
+                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed bg-white/40 dark:bg-slate-900/40 p-2.5 rounded-xl border border-slate-200/40 dark:border-white/5 line-clamp-2">
                         {exam.topics}
                       </p>
                     )}
@@ -164,7 +167,10 @@ export const ExamsView: React.FC = () => {
                   {/* Actions footer */}
                   <div className="flex items-center justify-between pt-3 mt-4 border-t border-slate-200/50 dark:border-white/5">
                     <button
-                      onClick={() => setActiveView('planner')}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setActiveView('planner');
+                      }}
                       className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1.5"
                     >
                       <Sparkles className="w-3.5 h-3.5 text-indigo-500" /> Planificar Estudio
@@ -172,14 +178,20 @@ export const ExamsView: React.FC = () => {
 
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => handleOpenEdit(exam)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEdit(exam);
+                        }}
                         className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white transition-colors"
                         title="Editar"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
-                        onClick={() => handleDelete(exam.id)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(exam.id);
+                        }}
                         className="p-1.5 rounded-lg bg-rose-500/10 text-rose-500 hover:bg-rose-500 hover:text-white transition-colors"
                         title="Eliminar"
                       >
@@ -206,7 +218,12 @@ export const ExamsView: React.FC = () => {
               const sub = subjects.find((s) => s.id === exam.subjectId);
 
               return (
-                <GlassCard key={exam.id} padding="md" className="opacity-80 hover:opacity-100 transition-opacity">
+                <GlassCard
+                  key={exam.id}
+                  padding="md"
+                  onClick={() => setSelectedDetailExam(exam)}
+                  className="opacity-80 hover:opacity-100 transition-opacity cursor-pointer"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       {sub && (
@@ -231,7 +248,10 @@ export const ExamsView: React.FC = () => {
                       </div>
                     ) : (
                       <button
-                        onClick={() => handleOpenEdit(exam)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEdit(exam);
+                        }}
                         className="text-xs font-semibold text-indigo-500 hover:underline"
                       >
                         + Añadir nota
@@ -244,6 +264,22 @@ export const ExamsView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Item Detail Modal */}
+      <ItemDetailModal
+        isOpen={Boolean(selectedDetailExam)}
+        onClose={() => setSelectedDetailExam(null)}
+        item={selectedDetailExam}
+        itemType="exam"
+        onEdit={(exam) => {
+          setSelectedDetailExam(null);
+          handleOpenEdit(exam);
+        }}
+        onDelete={(id) => {
+          handleDelete(id);
+          setSelectedDetailExam(null);
+        }}
+      />
 
       {/* Modal */}
       <ExamModal

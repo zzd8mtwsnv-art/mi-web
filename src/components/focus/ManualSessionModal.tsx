@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GlassModal } from '../ui/GlassModal';
 import { GlassButton } from '../ui/GlassButton';
@@ -10,39 +10,68 @@ interface ManualSessionModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialDate?: string;
+  initialData?: FocusSession | null;
 }
 
 export const ManualSessionModal: React.FC<ManualSessionModalProps> = ({
   isOpen,
   onClose,
-  initialDate
+  initialDate,
+  initialData
 }) => {
-  const { subjects, addFocusSession } = useApp();
+  const { subjects, addFocusSession, updateFocusSession } = useApp();
   const [subjectId, setSubjectId] = useState<string>(subjects[0]?.id || '');
   const [hours, setHours] = useState<number>(1);
   const [minutes, setMinutes] = useState<number>(0);
   const [date, setDate] = useState<string>(initialDate || getTodayDateString());
   const [notes, setNotes] = useState<string>('');
 
+  useEffect(() => {
+    if (initialData) {
+      setSubjectId(initialData.subjectId || '');
+      const h = Math.floor(initialData.durationMinutes / 60);
+      const m = initialData.durationMinutes % 60;
+      setHours(h);
+      setMinutes(m);
+      setDate(initialData.date.split('T')[0] || getTodayDateString());
+      setNotes(initialData.notes || '');
+    } else {
+      setSubjectId(subjects[0]?.id || '');
+      setHours(1);
+      setMinutes(0);
+      setDate(initialDate || getTodayDateString());
+      setNotes('');
+    }
+  }, [initialData, initialDate, isOpen, subjects]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const totalMinutes = Math.max(1, Number(hours) * 60 + Number(minutes));
 
-    const sessionData: Omit<FocusSession, 'id'> = {
-      durationMinutes: totalMinutes,
-      type: 'normal',
-      date: new Date(`${date}T12:00:00`).toISOString(),
-      completed: true,
-      ...(subjectId ? { subjectId } : {}),
-      ...(notes.trim() ? { notes: notes.trim() } : { notes: 'Estudio registrado manualmente' })
-    };
+    if (initialData) {
+      const updatePayload: Partial<FocusSession> = {
+        durationMinutes: totalMinutes,
+        date: new Date(`${date}T12:00:00`).toISOString(),
+        ...(subjectId ? { subjectId } : {}),
+        ...(notes.trim() ? { notes: notes.trim() } : { notes: 'Estudio registrado manualmente' })
+      };
+      if (!subjectId) {
+        delete updatePayload.subjectId;
+      }
+      updateFocusSession(initialData.id, updatePayload);
+    } else {
+      const sessionData: Omit<FocusSession, 'id'> = {
+        durationMinutes: totalMinutes,
+        type: 'normal',
+        date: new Date(`${date}T12:00:00`).toISOString(),
+        completed: true,
+        ...(subjectId ? { subjectId } : {}),
+        ...(notes.trim() ? { notes: notes.trim() } : { notes: 'Estudio registrado manualmente' })
+      };
+      addFocusSession(sessionData);
+    }
 
-    addFocusSession(sessionData);
     onClose();
-    // Reset form
-    setHours(1);
-    setMinutes(0);
-    setNotes('');
   };
 
   const totalCalculatedMinutes = Math.max(1, Number(hours) * 60 + Number(minutes));
@@ -51,8 +80,8 @@ export const ManualSessionModal: React.FC<ManualSessionModalProps> = ({
     <GlassModal
       isOpen={isOpen}
       onClose={onClose}
-      title="Registrar Estudio Manualmente"
-      subtitle="Añade tiempo de estudio realizado fuera de la app"
+      title={initialData ? 'Editar Sesión de Estudio' : 'Registrar Estudio Manualmente'}
+      subtitle={initialData ? 'Modifica la duración, materia o notas de la sesión' : 'Añade tiempo de estudio realizado fuera de la app'}
       maxWidth="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -157,7 +186,7 @@ export const ManualSessionModal: React.FC<ManualSessionModalProps> = ({
             size="sm"
             icon={<CheckCircle2 className="w-4 h-4" />}
           >
-            Guardar Estudio
+            {initialData ? 'Guardar Cambios' : 'Guardar Estudio'}
           </GlassButton>
         </div>
       </form>

@@ -5,6 +5,7 @@ import { GlassCard } from '../ui/GlassCard';
 import { GlassBadge } from '../ui/GlassBadge';
 import { GlassButton } from '../ui/GlassButton';
 import { TaskModal } from './TaskModal';
+import { ItemDetailModal } from '../common/ItemDetailModal';
 import { getRelativeDayString, getTodayDateString } from '../../utils/dateUtils';
 import {
   Plus,
@@ -30,16 +31,13 @@ export const TasksView: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [selectedDetailTask, setSelectedDetailTask] = useState<Task | null>(null);
 
   // Filters State
   const [filterPeriod, setFilterPeriod] = useState<'todas' | 'hoy' | 'semana' | 'completadas'>('todas');
   const [filterSubject, setFilterSubject] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Quick Add inline input
-  const [quickTitle, setQuickTitle] = useState('');
-  const [quickSubject, setQuickSubject] = useState(subjects[0]?.id || '');
 
   const todayStr = getTodayDateString();
 
@@ -55,6 +53,9 @@ export const TasksView: React.FC = () => {
     });
     setQuickTitle('');
   };
+
+  const [quickTitle, setQuickTitle] = useState('');
+  const [quickSubject, setQuickSubject] = useState(subjects[0]?.id || '');
 
   const handleOpenAdd = () => {
     setEditingTask(null);
@@ -112,10 +113,9 @@ export const TasksView: React.FC = () => {
     // Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      return (
-        t.title.toLowerCase().includes(q) ||
-        t.description?.toLowerCase().includes(q)
-      );
+      const matchTitle = t.title.toLowerCase().includes(q);
+      const matchDesc = t.description?.toLowerCase().includes(q);
+      if (!matchTitle && !matchDesc) return false;
     }
 
     return true;
@@ -126,11 +126,11 @@ export const TasksView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-            Tareas & Entregas
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+            Tareas & Deberes
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Gestiona tus deberes, lecturas y trabajos de clase
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+            Gestiona tus entregas, ejercicios y proyectos de Bachillerato
           </p>
         </div>
 
@@ -144,86 +144,22 @@ export const TasksView: React.FC = () => {
       </div>
 
       {/* Quick Add Bar */}
-      <GlassCard padding="sm" className="shadow-lg">
-        <form onSubmit={handleQuickAdd} className="flex flex-col sm:flex-row items-center gap-2">
-          <div className="relative flex-1 w-full">
-            <CheckSquare className="absolute left-3.5 top-3 w-4 h-4 text-indigo-500" />
-            <input
-              type="text"
-              value={quickTitle}
-              onChange={(e) => setQuickTitle(e.target.value)}
-              placeholder="Añadir tarea rápida y pulsar Enter... (ej. Resumen de Historia pág 40)"
-              className="w-full pl-10 pr-4 py-2.5 rounded-2xl glass-input text-sm"
-            />
-          </div>
+      <GlassCard padding="sm" className="shadow-md">
+        <form onSubmit={handleQuickAdd} className="flex items-center gap-2 sm:gap-3">
+          <input
+            type="text"
+            value={quickTitle}
+            onChange={(e) => setQuickTitle(e.target.value)}
+            placeholder="Añadir tarea rápida para hoy... (pulsa Enter)"
+            className="flex-1 bg-transparent px-3 py-2 text-sm text-slate-800 dark:text-slate-100 placeholder-slate-400 outline-none"
+          />
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <select
-              value={quickSubject}
-              onChange={(e) => setQuickSubject(e.target.value)}
-              className="px-3 py-2.5 rounded-2xl glass-input text-xs sm:text-sm"
-            >
-              <option value="">General</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-
-            <GlassButton variant="primary" size="sm" type="submit" className="shrink-0">
-              Añadir
-            </GlassButton>
-          </div>
-        </form>
-      </GlassCard>
-
-      {/* Filter and Search Bar */}
-      <div className="space-y-3">
-        {/* Main Period Pills */}
-        <div className="flex flex-wrap items-center gap-2">
-          {(['todas', 'hoy', 'semana', 'completadas'] as const).map((period) => (
-            <button
-              key={period}
-              onClick={() => setFilterPeriod(period)}
-              className={`px-4 py-2 rounded-2xl text-xs font-semibold capitalize transition-all ${
-                filterPeriod === period
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/25'
-                  : 'bg-white/60 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-700'
-              }`}
-            >
-              {period === 'todas'
-                ? 'Pendientes'
-                : period === 'hoy'
-                ? 'Para Hoy'
-                : period === 'semana'
-                ? 'Esta Semana'
-                : 'Completadas'}
-            </button>
-          ))}
-        </div>
-
-        {/* Dropdown Filters & Search */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar en tareas..."
-              className="w-full pl-10 pr-3 py-2 rounded-2xl glass-input text-xs sm:text-sm"
-            />
-          </div>
-
-          {/* Subject Filter */}
           <select
-            value={filterSubject}
-            onChange={(e) => setFilterSubject(e.target.value)}
-            className="w-full px-3 py-2 rounded-2xl glass-input text-xs sm:text-sm"
+            value={quickSubject}
+            onChange={(e) => setQuickSubject(e.target.value)}
+            className="hidden sm:block text-xs bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-white/10 rounded-xl px-2.5 py-1.5 font-medium outline-none"
           >
-            <option value="all">Todas las Asignaturas</option>
+            <option value="">General</option>
             {subjects.map((s) => (
               <option key={s.id} value={s.id}>
                 {s.name}
@@ -231,22 +167,70 @@ export const TasksView: React.FC = () => {
             ))}
           </select>
 
-          {/* Priority Filter */}
-          <select
-            value={filterPriority}
-            onChange={(e) => setFilterPriority(e.target.value)}
-            className="w-full px-3 py-2 rounded-2xl glass-input text-xs sm:text-sm"
+          <GlassButton
+            type="submit"
+            variant="primary"
+            size="sm"
+            disabled={!quickTitle.trim()}
           >
-            <option value="all">Todas las Prioridades</option>
-            <option value="urgente">Urgente</option>
-            <option value="alta">Alta</option>
-            <option value="media">Media</option>
-            <option value="baja">Baja</option>
+            Añadir
+          </GlassButton>
+        </form>
+      </GlassCard>
+
+      {/* Filters & Search Row */}
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        {/* Period Pills */}
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-white/10 overflow-x-auto">
+          {[
+            { id: 'todas', label: 'Pendientes' },
+            { id: 'hoy', label: 'Para Hoy' },
+            { id: 'semana', label: 'Próximos 7 días' },
+            { id: 'completadas', label: 'Completadas' }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterPeriod(tab.id as any)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
+                filterPeriod === tab.id
+                  ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Search & Subject dropdowns */}
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <div className="relative flex-1 sm:w-56">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar tareas..."
+              className="w-full pl-9 pr-3 py-1.5 rounded-xl glass-input text-xs"
+            />
+          </div>
+
+          <select
+            value={filterSubject}
+            onChange={(e) => setFilterSubject(e.target.value)}
+            className="text-xs rounded-xl glass-input px-3 py-1.5"
+          >
+            <option value="all">Todas las materias</option>
+            {subjects.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
-      {/* Task List */}
+      {/* Task Cards List */}
       <div className="space-y-3">
         {filteredTasks.length === 0 ? (
           <GlassCard padding="lg" className="text-center py-12">
@@ -269,7 +253,8 @@ export const TasksView: React.FC = () => {
               <GlassCard
                 key={t.id}
                 padding="md"
-                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 group transition-all ${
+                onClick={() => setSelectedDetailTask(t)}
+                className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 group transition-all cursor-pointer hover:border-indigo-400/60 ${
                   isDone ? 'opacity-65' : ''
                 }`}
               >
@@ -277,6 +262,7 @@ export const TasksView: React.FC = () => {
                   <input
                     type="checkbox"
                     checked={isDone}
+                    onClick={(e) => e.stopPropagation()}
                     onChange={() => toggleTaskComplete(t.id)}
                     className="w-5 h-5 mt-0.5 text-indigo-600 rounded-lg border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
                   />
@@ -345,14 +331,20 @@ export const TasksView: React.FC = () => {
 
                   <div className="flex items-center gap-1 opacity-80 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                     <button
-                      onClick={() => handleOpenEdit(t)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenEdit(t);
+                      }}
                       className="p-2 rounded-xl bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition-colors"
                       title="Editar tarea"
                     >
                       <Edit2 className="w-3.5 h-3.5" />
                     </button>
                     <button
-                      onClick={() => handleDelete(t.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(t.id);
+                      }}
                       className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white transition-colors"
                       title="Eliminar tarea"
                     >
@@ -366,7 +358,23 @@ export const TasksView: React.FC = () => {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Item Detail Modal */}
+      <ItemDetailModal
+        isOpen={Boolean(selectedDetailTask)}
+        onClose={() => setSelectedDetailTask(null)}
+        item={selectedDetailTask}
+        itemType="task"
+        onEdit={(task) => {
+          setSelectedDetailTask(null);
+          handleOpenEdit(task);
+        }}
+        onDelete={(id) => {
+          handleDelete(id);
+          setSelectedDetailTask(null);
+        }}
+      />
+
+      {/* Edit / Create Task Modal */}
       <TaskModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}

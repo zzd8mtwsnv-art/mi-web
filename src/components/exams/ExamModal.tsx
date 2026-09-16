@@ -4,6 +4,7 @@ import { useApp } from '../../context/AppContext';
 import { GlassModal } from '../ui/GlassModal';
 import { GlassButton } from '../ui/GlassButton';
 import { getTodayDateString } from '../../utils/dateUtils';
+import { Clock } from 'lucide-react';
 
 interface ExamModalProps {
   isOpen: boolean;
@@ -22,6 +23,7 @@ export const ExamModal: React.FC<ExamModalProps> = ({
   const [title, setTitle] = useState('');
   const [subjectId, setSubjectId] = useState('');
   const [date, setDate] = useState(getTodayDateString());
+  const [hasTime, setHasTime] = useState<boolean>(false);
   const [time, setTime] = useState('09:30');
   const [classroom, setClassroom] = useState('');
   const [topics, setTopics] = useState('');
@@ -36,7 +38,13 @@ export const ExamModal: React.FC<ExamModalProps> = ({
       setTitle(initialData.title);
       setSubjectId(initialData.subjectId);
       setDate(initialData.date);
-      setTime(initialData.time || '09:30');
+      if (initialData.time) {
+        setHasTime(true);
+        setTime(initialData.time);
+      } else {
+        setHasTime(false);
+        setTime('09:30');
+      }
       setClassroom(initialData.classroom || '');
       setTopics(initialData.topics || '');
       setImportance(initialData.importance);
@@ -48,6 +56,7 @@ export const ExamModal: React.FC<ExamModalProps> = ({
       setTitle('');
       setSubjectId(subjects[0]?.id || '');
       setDate(getTodayDateString());
+      setHasTime(false);
       setTime('09:30');
       setClassroom('');
       setTopics('');
@@ -70,7 +79,7 @@ export const ExamModal: React.FC<ExamModalProps> = ({
       importance,
       maxGrade: Number(maxGrade),
       weightPercentage: Number(weightPercentage),
-      ...(time ? { time } : {}),
+      ...(hasTime && time ? { time: time.trim() } : {}),
       ...(classroom.trim() ? { classroom: classroom.trim() } : {}),
       ...(topics.trim() ? { topics: topics.trim() } : {}),
       ...(grade !== '' ? { grade: Number(grade) } : {}),
@@ -138,31 +147,43 @@ export const ExamModal: React.FC<ExamModalProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Hora
+        {/* Optional Time Toggle & Input */}
+        <div className="p-3 rounded-2xl bg-slate-100/60 dark:bg-slate-900/40 border border-slate-200/50 dark:border-white/5 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1.5 cursor-pointer select-none">
+              <Clock className="w-3.5 h-3.5 text-rose-500" /> ¿Añadir hora del examen?
             </label>
             <input
-              type="time"
-              value={time}
-              onChange={(e) => setTime(e.target.value)}
-              className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm"
+              type="checkbox"
+              checked={hasTime}
+              onChange={(e) => setHasTime(e.target.checked)}
+              className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500 cursor-pointer"
             />
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Aula / Lab
-            </label>
-            <input
-              type="text"
-              value={classroom}
-              onChange={(e) => setClassroom(e.target.value)}
-              placeholder="Ej. Aula 204"
-              className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm"
-            />
-          </div>
+          {hasTime && (
+            <div className="pt-1">
+              <input
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl glass-input text-sm font-semibold"
+              />
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            Aula o Laboratorio (opcional)
+          </label>
+          <input
+            type="text"
+            value={classroom}
+            onChange={(e) => setClassroom(e.target.value)}
+            placeholder="Ej. Aula 204, Laboratorio de Física..."
+            className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm"
+          />
         </div>
 
         {/* Importance Level */}
@@ -174,16 +195,16 @@ export const ExamModal: React.FC<ExamModalProps> = ({
             {[
               { id: 'normal', label: 'Normal' },
               { id: 'alta', label: 'Alta' },
-              { id: 'crucial', label: 'Crucial (Evaluación)' }
+              { id: 'crucial', label: 'Crucial (Global)' }
             ].map((imp) => (
               <button
                 key={imp.id}
                 type="button"
-                onClick={() => setImportance(imp.id as 'normal' | 'alta' | 'crucial')}
+                onClick={() => setImportance(imp.id as any)}
                 className={`py-2 text-xs font-semibold rounded-xl border transition-all ${
                   importance === imp.id
-                    ? 'bg-rose-500 text-white border-rose-500 shadow-sm'
-                    : 'bg-white/40 dark:bg-slate-800/40 text-slate-600 dark:text-slate-400 border-slate-200/60 dark:border-white/10'
+                    ? 'bg-rose-500 text-white border-transparent shadow-md'
+                    : 'bg-white/40 dark:bg-slate-800/40 text-slate-600 dark:text-slate-300 border-slate-200/60 dark:border-white/10'
                 }`}
               >
                 {imp.label}
@@ -192,41 +213,25 @@ export const ExamModal: React.FC<ExamModalProps> = ({
           </div>
         </div>
 
-        {/* Topics */}
+        {/* Topics / Content */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-            Temas que entran
+            Temario o Contenidos a Evaluar
           </label>
-          <input
-            type="text"
+          <textarea
+            rows={2}
             value={topics}
             onChange={(e) => setTopics(e.target.value)}
-            placeholder="Ej. Tema 1: Matrices, Tema 2: Determinantes..."
-            className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm"
+            placeholder="Ej. Temas 3 y 4: Matrices, determinantes y sistemas..."
+            className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm resize-none"
           />
         </div>
 
-        {/* Grade obtained (optional) & Weight */}
-        <div className="grid grid-cols-2 gap-3">
+        {/* Weights & Grades */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <div>
             <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Nota obtenida (si ya se realizó)
-            </label>
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              max="10"
-              value={grade}
-              onChange={(e) => setGrade(e.target.value)}
-              placeholder="Ej. 8.75"
-              className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm font-mono"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Ponderación (% nota evaluación)
+              Ponderación (%)
             </label>
             <input
               type="number"
@@ -234,16 +239,61 @@ export const ExamModal: React.FC<ExamModalProps> = ({
               max="100"
               value={weightPercentage}
               onChange={(e) => setWeightPercentage(Number(e.target.value))}
-              className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm font-mono"
+              className="w-full px-3.5 py-2 rounded-xl glass-input text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Nota Obtenida
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              max={maxGrade}
+              value={grade}
+              onChange={(e) => setGrade(e.target.value)}
+              placeholder="Pendiente"
+              className="w-full px-3.5 py-2 rounded-xl glass-input text-sm"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+              Nota Máxima
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              value={maxGrade}
+              onChange={(e) => setMaxGrade(Number(e.target.value))}
+              className="w-full px-3.5 py-2 rounded-xl glass-input text-sm"
             />
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-200/60 dark:border-white/10">
-          <GlassButton variant="secondary" type="button" onClick={onClose}>
+        {/* Notes / Description */}
+        <div>
+          <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+            Notas / Descripción adicional
+          </label>
+          <textarea
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="Material permitido (calculadora, tablas), formato del examen..."
+            className="w-full px-3.5 py-2.5 rounded-2xl glass-input text-sm resize-none"
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-end gap-2 pt-2">
+          <GlassButton type="button" variant="ghost" size="sm" onClick={onClose}>
             Cancelar
           </GlassButton>
-          <GlassButton variant="primary" type="submit">
+          <GlassButton type="submit" variant="primary" size="sm">
             {initialData ? 'Guardar Cambios' : 'Crear Examen'}
           </GlassButton>
         </div>

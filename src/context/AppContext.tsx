@@ -115,6 +115,7 @@ interface AppContextType {
 
   // Actions - Focus & Sessions
   addFocusSession: (session: Omit<FocusSession, 'id'>) => void;
+  updateFocusSession: (id: string, session: Partial<FocusSession>) => void;
   deleteFocusSession: (id: string) => void;
 
   // Actions - Grades
@@ -758,26 +759,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setSchedule((prev) => prev.filter((s) => s.id !== id));
   };
 
-  const addFocusSession = (session: Omit<FocusSession, 'id'>) => {
-    const newSession: FocusSession = {
-      ...session,
-      id: `sess-${Date.now()}`
-    };
-    setSessions((prev) => [newSession, ...prev]);
+  const syncDailyGoalsWithSessions = (sessionList: FocusSession[]) => {
+    const today = getTodayDateString();
+    const todayMins = sessionList
+      .filter((s) => s.date.startsWith(today) && s.completed)
+      .reduce((acc, curr) => acc + curr.durationMinutes, 0);
 
     setGoals((prev) =>
       prev.map((g) => {
         if (g.type === 'daily_time') {
-          const updated = g.currentValue + session.durationMinutes;
           return {
             ...g,
-            currentValue: updated,
-            completed: updated >= g.targetValue
+            currentValue: todayMins,
+            completed: todayMins >= g.targetValue
           };
         }
         return g;
       })
     );
+  };
+
+  const addFocusSession = (session: Omit<FocusSession, 'id'>) => {
+    const newSession: FocusSession = {
+      ...session,
+      id: `sess-${Date.now()}`
+    };
+    const updated = [newSession, ...sessions];
+    setSessions(updated);
+    syncDailyGoalsWithSessions(updated);
 
     const streak = currentStreak + 1;
     if (streak > streakRecord) {
@@ -785,8 +794,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  const updateFocusSession = (id: string, sessionData: Partial<FocusSession>) => {
+    const updated = sessions.map((s) => (s.id === id ? { ...s, ...sessionData } : s));
+    setSessions(updated);
+    syncDailyGoalsWithSessions(updated);
+  };
+
   const deleteFocusSession = (id: string) => {
-    setSessions((prev) => prev.filter((s) => s.id !== id));
+    const updated = sessions.filter((s) => s.id !== id);
+    setSessions(updated);
+    syncDailyGoalsWithSessions(updated);
   };
 
   const addGradeItem = (grade: Omit<GradeItem, 'id'>) => {
@@ -1012,6 +1029,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteScheduleItem,
 
         addFocusSession,
+        updateFocusSession,
         deleteFocusSession,
 
         addGradeItem,
