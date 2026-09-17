@@ -21,8 +21,8 @@ export const ManualSessionModal: React.FC<ManualSessionModalProps> = ({
 }) => {
   const { subjects, addFocusSession, updateFocusSession } = useApp();
   const [subjectId, setSubjectId] = useState<string>(subjects[0]?.id || '');
-  const [hours, setHours] = useState<number>(1);
-  const [minutes, setMinutes] = useState<number>(0);
+  const [hours, setHours] = useState<number | string>(1);
+  const [minutes, setMinutes] = useState<number | string>(0);
   const [date, setDate] = useState<string>(initialDate || getTodayDateString());
   const [notes, setNotes] = useState<string>('');
 
@@ -44,9 +44,15 @@ export const ManualSessionModal: React.FC<ManualSessionModalProps> = ({
     }
   }, [initialData, initialDate, isOpen, subjects]);
 
+  const numHours = typeof hours === 'number' ? hours : parseInt(hours, 10) || 0;
+  const numMinutes = typeof minutes === 'number' ? minutes : parseInt(minutes, 10) || 0;
+  const totalCalculatedMinutes = Math.max(1, numHours * 60 + numMinutes);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const totalMinutes = Math.max(1, Number(hours) * 60 + Number(minutes));
+    const finalHours = typeof hours === 'number' ? hours : parseInt(hours, 10) || 0;
+    const finalMinutes = typeof minutes === 'number' ? minutes : parseInt(minutes, 10) || 0;
+    const totalMinutes = Math.max(1, finalHours * 60 + finalMinutes);
 
     if (initialData) {
       const updatePayload: Partial<FocusSession> = {
@@ -73,8 +79,6 @@ export const ManualSessionModal: React.FC<ManualSessionModalProps> = ({
 
     onClose();
   };
-
-  const totalCalculatedMinutes = Math.max(1, Number(hours) * 60 + Number(minutes));
 
   return (
     <GlassModal
@@ -116,8 +120,24 @@ export const ManualSessionModal: React.FC<ManualSessionModalProps> = ({
                   type="number"
                   min="0"
                   max="24"
+                  step="1"
                   value={hours}
-                  onChange={(e) => setHours(Math.max(0, parseInt(e.target.value) || 0))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setHours('');
+                    } else {
+                      const parsed = parseInt(val, 10);
+                      if (!isNaN(parsed)) {
+                        setHours(Math.max(0, Math.min(24, parsed)));
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    if (hours === '' || isNaN(Number(hours))) {
+                      setHours(0);
+                    }
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm font-bold text-center pr-12"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 pointer-events-none">
@@ -131,9 +151,24 @@ export const ManualSessionModal: React.FC<ManualSessionModalProps> = ({
                   type="number"
                   min="0"
                   max="59"
-                  step="5"
+                  step="1"
                   value={minutes}
-                  onChange={(e) => setMinutes(Math.max(0, Math.min(59, parseInt(e.target.value) || 0)))}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    if (val === '') {
+                      setMinutes('');
+                    } else {
+                      const parsed = parseInt(val, 10);
+                      if (!isNaN(parsed)) {
+                        setMinutes(Math.max(0, Math.min(59, parsed)));
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    if (minutes === '' || isNaN(Number(minutes))) {
+                      setMinutes(0);
+                    }
+                  }}
                   className="w-full px-3.5 py-2.5 rounded-xl glass-input text-sm font-bold text-center pr-12"
                 />
                 <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400 pointer-events-none">
