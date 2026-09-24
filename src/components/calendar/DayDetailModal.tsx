@@ -21,9 +21,11 @@ import {
   Plus,
   BookOpen,
   Sparkles,
-  Edit2
+  Edit2,
+  CalendarRange,
+  ArrowRight
 } from 'lucide-react';
-import { Task, Exam, CustomEvent, FocusSession } from '../../types';
+import { Task, Exam, CustomEvent, FocusSession, StudyPlan, PlannedStudySession } from '../../types';
 
 interface DayDetailModalProps {
   isOpen: boolean;
@@ -44,13 +46,16 @@ export const DayDetailModal: React.FC<DayDetailModalProps> = ({
     exams,
     sessions,
     customEvents,
+    plans,
     toggleTaskComplete,
     deleteTask,
     deleteExam,
     deleteCustomEvent,
     deleteFocusSession,
     updateTask,
-    updateExam
+    updateExam,
+    updatePlanSession,
+    setActiveView
   } = useApp();
 
   // Item Detail Modal state
@@ -65,13 +70,47 @@ export const DayDetailModal: React.FC<DayDetailModalProps> = ({
 
   if (!dateStr) return null;
 
+  // Normalizer for backward compatibility with plans
+  const getPlanSessions = (plan: StudyPlan): PlannedStudySession[] => {
+    if (plan.sessions && Array.isArray(plan.sessions)) {
+      return plan.sessions;
+    }
+    if (plan.milestones && Array.isArray(plan.milestones)) {
+      const ms = plan.milestones;
+      return ms.map((m, idx) => ({
+        id: m.id || `legacy-${plan.id}-${idx}`,
+        planId: plan.id,
+        date: m.date || plan.startDate || new Date().toISOString().split('T')[0],
+        dayPart: 'tarde',
+        subjectId: plan.subjectId,
+        durationMinutes: m.durationMinutes || 60,
+        title: m.title || `Sesión ${idx + 1}`,
+        content: m.topics || m.title || '',
+        completed: m.completed ?? false
+      }));
+    }
+    return [];
+  };
+
   // Filter items for this date
   const dayExams = exams.filter((e) => e.date === dateStr);
   const dayTasks = tasks.filter((t) => t.dueDate === dateStr);
   const daySessions = sessions.filter((s) => s.date.startsWith(dateStr));
   const dayCustomEvents = customEvents.filter((ev) => ev.date === dateStr);
 
+  // Filter planned study sessions from all plans for this date
+  const dayPlannedSessions: PlannedStudySession[] = [];
+  plans.forEach((p) => {
+    const pSessions = getPlanSessions(p);
+    pSessions.forEach((ps) => {
+      if (ps.date === dateStr) {
+        dayPlannedSessions.push(ps);
+      }
+    });
+  });
+
   const totalStudyMinutes = daySessions.reduce((acc, s) => acc + s.durationMinutes, 0);
+  const totalPlannedMinutes = dayPlannedSessions.reduce((acc, s) => acc + s.durationMinutes, 0);
 
   // Group study minutes by subject
   const studyBySubject: Record<string, number> = {};
@@ -154,7 +193,7 @@ export const DayDetailModal: React.FC<DayDetailModalProps> = ({
   const capitalizedDate = fullDateFormatted.charAt(0).toUpperCase() + fullDateFormatted.slice(1);
 
   const isToday = dateStr === new Date().toISOString().split('T')[0];
-  const hasAnyContent = allItems.length > 0 || daySessions.length > 0;
+  const hasAnyContent = allItems.length > 0 || daySessions.length > 0 || dayPlannedSessions.length > 0;
 
   const handleOpenItemDetail = (item: any, type: DetailItemType) => {
     setSelectedDetailItem(item);
@@ -408,7 +447,103 @@ export const DayDetailModal: React.FC<DayDetailModalProps> = ({
             </div>
           )}
 
-          {/* 3. SECCIÓN DE ESTUDIO AGRUPADO */}
+          {/* 3. SECCIÓN DE ESTUDIO PLANIFICADO (CRONOGRAMA) */}
+          {dayPlannedSessions.length > 0 && (
+            <div className="space-y-3 pt-2 border-t border-slate-200/60 dark:border-white/10">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-400 flex items-center gap-1.5">
+                  <CalendarRange className="w-3.5 h-3.5 text-teal-500" /> Estudio Planificado ({formatMinutes(totalPlannedMinutes)})
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    setActiveView('cronograma');
+                  }}
+                  className="text-xs font-bold text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1"
+                >
+                  <span>Ver Cronograma</span>
+                  <ArrowRight className="w-3 h-3" />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                {dayPlannedSessions.map((sess) => {
+                  const sub = subjects.find((s) => s.id === sess.subjectId);
+                  const partColor =
+                    sess.dayPart === 'mañana'
+                      ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
+                      : sess.dayPart === 'tarde'
+                      ? 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20'
+                      : 'bg-purple-500/10 text-purple-600 border-purple-500/20';
+
+                  return (
+                    <div
+                      key={sess.id}
+                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 shadow-sm ${
+                        sess.completed
+                          ? 'bg-slate-100/50 dark:bg-slate-900/30 border-slate-200/50 dark:border-white/5 opacity-70'
+                          : 'bg-teal-50/40 dark:bg-teal-950/20 border-teal-500/20 dark:border-teal-500/30'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 truncate">
+                        <button
+                          type="button"
+                          onClick={() => updatePlanSession(sess.planId, sess.id, { completed: !sess.completed })}
+                          className="p-1 rounded-lg text-slate-400 hover:text-teal-500 transition-colors shrink-0"
+                          title={sess.completed ? 'Marcar como pendiente' : 'Marcar como completado'}
+                        >
+                          {sess.completed ? (
+                            <CheckSquare className="w-4 h-4 text-teal-500" />
+                          ) : (
+                            <Square className="w-4 h-4" />
+                          )}
+                        </button>
+
+                        <div className="truncate">
+                          <div className="flex items-center gap-2">
+                            <span
+                              className={`text-sm font-bold truncate ${
+                                sess.completed ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'
+                              }`}
+                            >
+                              {sess.title}
+                            </span>
+                            {sess.dayPart && (
+                              <span className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase border ${partColor}`}>
+                                {sess.dayPart}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-400">
+                            {sub && (
+                              <span
+                                className="text-[10px] font-bold px-1.5 py-0.5 rounded text-white"
+                                style={{ backgroundColor: sub.color }}
+                              >
+                                {sub.shortName || sub.name}
+                              </span>
+                            )}
+                            {sess.content && sess.content !== sess.title && (
+                              <span className="truncate max-w-xs">{sess.content}</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="px-2 py-0.5 rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs font-bold border border-teal-500/20 font-mono">
+                          {sess.durationMinutes} min
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 4. SECCIÓN DE ESTUDIO AGRUPADO (REAL) */}
           {daySessions.length > 0 && (
             <div className="space-y-3 pt-2 border-t border-slate-200/60 dark:border-white/10">
               <div className="flex items-center justify-between">

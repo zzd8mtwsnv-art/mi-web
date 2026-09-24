@@ -19,6 +19,7 @@ import { SubjectsView } from './components/subjects/SubjectsView';
 import { ExamsView } from './components/exams/ExamsView';
 import { FocusView } from './components/focus/FocusView';
 import { PlannerView } from './components/planner/PlannerView';
+import { CronogramaView } from './components/cronograma/CronogramaView';
 import { GradesView } from './components/grades/GradesView';
 import { StatsView } from './components/stats/StatsView';
 import { SettingsView } from './components/settings/SettingsView';
@@ -68,6 +69,8 @@ const MainContent: React.FC = () => {
         return <FocusView />;
       case 'planner':
         return <PlannerView />;
+      case 'cronograma':
+        return <CronogramaView />;
       case 'grades':
         return <GradesView />;
       case 'stats':

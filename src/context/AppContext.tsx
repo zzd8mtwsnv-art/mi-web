@@ -11,6 +11,7 @@ import {
   GradeItem,
   Goal,
   StudyPlan,
+  PlannedStudySession,
   NotificationItem,
   Settings,
   CustomEvent,
@@ -128,11 +129,15 @@ interface AppContextType {
   updateGoal: (id: string, goal: Partial<Goal>) => void;
   deleteGoal: (id: string) => void;
 
-  // Actions - Study Planner
+  // Actions - Study Planner / Cronograma
   addStudyPlan: (plan: Omit<StudyPlan, 'id' | 'createdAt'>) => StudyPlan;
+  savePlanAndSync: (plan: Omit<StudyPlan, 'id' | 'createdAt'>) => Promise<{ success: boolean; plan?: StudyPlan; error?: string }>;
   updateStudyPlan: (id: string, plan: Partial<StudyPlan>) => void;
   deleteStudyPlan: (id: string) => void;
   togglePlanMilestone: (planId: string, milestoneId: string) => void;
+  addSessionToPlan: (planId: string, session: Omit<PlannedStudySession, 'id' | 'planId'>) => void;
+  updatePlanSession: (planId: string, sessionId: string, sessionData: Partial<PlannedStudySession>) => void;
+  deletePlanSession: (planId: string, sessionId: string) => void;
 
   // Actions - Custom Events (Evento, Exposición, Recordatorio)
   addCustomEvent: (event: Omit<CustomEvent, 'id' | 'createdAt'>) => CustomEvent;
@@ -848,6 +853,50 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return newPlan;
   };
 
+  const savePlanAndSync = async (
+    plan: Omit<StudyPlan, 'id' | 'createdAt'>
+  ): Promise<{ success: boolean; plan?: StudyPlan; error?: string }> => {
+    const newPlan: StudyPlan = {
+      ...plan,
+      id: `plan-${Date.now()}`,
+      createdAt: new Date().toISOString()
+    };
+    const updatedPlans = [newPlan, ...plans];
+    setPlans(updatedPlans);
+
+    // If logged in with Firebase, wait for real confirmation from Firestore
+    if (authUser && authUser.providerId !== 'demo' && isFirebaseReady) {
+      if (!isHydratedRef.current) {
+        return { success: false, error: 'Sincronización bloqueada durante la hidratación inicial.' };
+      }
+      setSyncStatus('syncing');
+      const cloudPayload: CloudStudyData = {
+        subjects,
+        tasks,
+        exams,
+        schedule,
+        sessions,
+        grades,
+        goals,
+        plans: updatedPlans,
+        notifications,
+        customEvents,
+        settings,
+        streakRecord
+      };
+      const ok = await saveCloudData(authUser.uid, cloudPayload, authUser);
+      setSyncStatus(ok ? 'synced' : 'error');
+      if (ok) {
+        return { success: true, plan: newPlan };
+      } else {
+        return { success: false, error: 'No se pudo confirmar la escritura en Firestore. Revisa tu conexión.' };
+      }
+    } else {
+      // Local/demo mode
+      return { success: true, plan: newPlan };
+    }
+  };
+
   const updateStudyPlan = (id: string, planData: Partial<StudyPlan>) => {
     setPlans((prev) => prev.map((p) => (p.id === id ? { ...p, ...planData } : p)));
   };
@@ -859,7 +908,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const togglePlanMilestone = (planId: string, milestoneId: string) => {
     setPlans((prev) =>
       prev.map((plan) => {
-        if (plan.id === planId) {
+        if (plan.id === planId && plan.milestones) {
           const updatedMilestones = plan.milestones.map((m) => {
             if (m.id === milestoneId) {
               const nextState = !m.completed;
@@ -871,6 +920,53 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return { ...plan, milestones: updatedMilestones };
         }
         return plan;
+      })
+    );
+  };
+
+  const addSessionToPlan = (planId: string, session: Omit<PlannedStudySession, 'id' | 'planId'>) => {
+    const newSession: PlannedStudySession = {
+      ...session,
+      id: `sess-${Date.now()}`,
+      planId
+    };
+    setPlans((prev) =>
+      prev.map((p) => {
+        if (p.id === planId) {
+          const currentSessions = p.sessions || [];
+          return { ...p, sessions: [...currentSessions, newSession] };
+        }
+        return p;
+      })
+    );
+  };
+
+  const updatePlanSession = (planId: string, sessionId: string, sessionData: Partial<PlannedStudySession>) => {
+    setPlans((prev) =>
+      prev.map((p) => {
+        if (p.id === planId) {
+          const currentSessions = p.sessions || [];
+          return {
+            ...p,
+            sessions: currentSessions.map((s) => (s.id === sessionId ? { ...s, ...sessionData } : s))
+          };
+        }
+        return p;
+      })
+    );
+  };
+
+  const deletePlanSession = (planId: string, sessionId: string) => {
+    setPlans((prev) =>
+      prev.map((p) => {
+        if (p.id === planId) {
+          const currentSessions = p.sessions || [];
+          return {
+            ...p,
+            sessions: currentSessions.filter((s) => s.id !== sessionId)
+          };
+        }
+        return p;
       })
     );
   };
@@ -1041,9 +1137,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteGoal,
 
         addStudyPlan,
+        savePlanAndSync,
         updateStudyPlan,
         deleteStudyPlan,
         togglePlanMilestone,
+        addSessionToPlan,
+        updatePlanSession,
+        deletePlanSession,
 
         addCustomEvent,
         updateCustomEvent,

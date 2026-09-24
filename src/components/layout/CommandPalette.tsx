@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search,
@@ -206,8 +206,42 @@ export const CommandPalette: React.FC = () => {
               </div>
             )}
 
+            {/* Plans / Cronogramas Section */}
+            {filteredPlans.length > 0 && (
+              <div>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400 px-3 block mb-2">
+                  Planes y Cronogramas
+                </span>
+                <div className="space-y-1">
+                  {filteredPlans.map((p) => {
+                    const sub = subjects.find((s) => s.id === p.subjectId);
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => handleSelect('cronograma')}
+                        className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl hover:bg-teal-50/70 dark:hover:bg-teal-950/40 cursor-pointer transition-colors group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Calendar className="w-4 h-4 text-teal-500 shrink-0" />
+                          <div>
+                            <span className="text-sm font-medium text-slate-800 dark:text-slate-200 group-hover:text-teal-500">
+                              {p.title}
+                            </span>
+                            <div className="text-xs text-slate-400 dark:text-slate-400 mt-0.5">
+                              {sub ? `Materia: ${sub.name} • ` : ''}{(p.sessions?.length || p.milestones?.length || 0)} sesiones
+                            </div>
+                          </div>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-teal-500 transition-transform group-hover:translate-x-1" />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Empty State */}
-            {filteredSubjects.length === 0 && filteredTasks.length === 0 && filteredExams.length === 0 && (
+            {filteredSubjects.length === 0 && filteredTasks.length === 0 && filteredExams.length === 0 && filteredPlans.length === 0 && (
               <div className="py-12 text-center">
                 <p className="text-sm text-slate-500 dark:text-slate-400">
                   No se encontraron resultados para &ldquo;{query}&rdquo;

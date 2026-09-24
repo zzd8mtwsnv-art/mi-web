@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {
   LayoutDashboard,
   Calendar as CalendarIcon,
@@ -8,6 +8,7 @@ import {
   FileText,
   Timer,
   Sparkles,
+  CalendarRange,
   Award,
   BarChart3,
   Settings as SettingsIcon,
@@ -27,6 +28,7 @@ export const Sidebar: React.FC = () => {
     { id: 'exams', label: 'Exámenes', icon: FileText, badge: upcomingExamsCount > 0 ? upcomingExamsCount : undefined, badgeColor: 'bg-rose-500' },
     { id: 'focus', label: 'Focus', icon: Timer },
     { id: 'planner', label: 'Planificador', icon: Sparkles },
+    { id: 'cronograma', label: 'Cronograma', icon: CalendarRange },
     { id: 'grades', label: 'Notas', icon: Award },
     { id: 'stats', label: 'Estadísticas', icon: BarChart3 },
   ];

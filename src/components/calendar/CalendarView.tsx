@@ -6,6 +6,7 @@ import { GlassButton } from '../ui/GlassButton';
 import { EventModal } from './EventModal';
 import { DayDetailModal } from './DayDetailModal';
 import { SPANISH_MONTHS, formatMinutes } from '../../utils/dateUtils';
+import { StudyPlan, PlannedStudySession } from '../../types';
 import {
   ChevronLeft,
   ChevronRight,
@@ -17,11 +18,12 @@ import {
   Mic,
   Bell,
   Trash2,
-  Sparkles
+  Sparkles,
+  CalendarRange
 } from 'lucide-react';
 
 export const CalendarView: React.FC = () => {
-  const { tasks, exams, schedule, sessions, customEvents, deleteCustomEvent, toggleCustomEventComplete } = useApp();
+  const { tasks, exams, schedule, sessions, customEvents, plans, subjects, deleteCustomEvent, toggleCustomEventComplete } = useApp();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day'>('month');
   
@@ -80,6 +82,28 @@ export const CalendarView: React.FC = () => {
     calendarCells.push({ dayNumber: d, dateStr });
   }
 
+  // Normalizer for backward compatibility with plans
+  const getPlanSessions = (plan: StudyPlan): PlannedStudySession[] => {
+    if (plan.sessions && Array.isArray(plan.sessions)) {
+      return plan.sessions;
+    }
+    if (plan.milestones && Array.isArray(plan.milestones)) {
+      const ms = plan.milestones;
+      return ms.map((m, idx) => ({
+        id: m.id || `legacy-${plan.id}-${idx}`,
+        planId: plan.id,
+        date: m.date || plan.startDate || new Date().toISOString().split('T')[0],
+        dayPart: 'tarde',
+        subjectId: plan.subjectId,
+        durationMinutes: m.durationMinutes || 60,
+        title: m.title || `Sesión ${idx + 1}`,
+        content: m.topics || m.title || '',
+        completed: m.completed ?? false
+      }));
+    }
+    return [];
+  };
+
   // Get and structure items for a given date (with visual aggregation for study)
   const getDayItems = (dateStr: string) => {
     const dayExams = exams.filter((e) => e.date === dateStr);
@@ -87,11 +111,22 @@ export const CalendarView: React.FC = () => {
     const daySessions = sessions.filter((s) => s.date.startsWith(dateStr));
     const dayCustomEvents = customEvents.filter((ev) => ev.date === dateStr);
 
+    // Extract planned sessions for this date across all plans
+    const dayPlannedSessions: PlannedStudySession[] = [];
+    plans.forEach((p) => {
+      const pSessions = getPlanSessions(p);
+      pSessions.forEach((ps) => {
+        if (ps.date === dateStr) {
+          dayPlannedSessions.push(ps);
+        }
+      });
+    });
+
     const totalStudyMinutes = daySessions.reduce((acc, s) => acc + s.durationMinutes, 0);
 
     const allVisualItems: Array<{
       id: string;
-      type: 'exam' | 'exposicion' | 'evento' | 'recordatorio' | 'task' | 'study';
+      type: 'exam' | 'exposicion' | 'evento' | 'recordatorio' | 'task' | 'study' | 'planned';
       title: string;
       icon: any;
       className: string;
@@ -161,7 +196,21 @@ export const CalendarView: React.FC = () => {
       });
     });
 
-    // 6. Aggregated Study (ONE item for all sessions of this day)
+    // 6. Planned Study Sessions (Cronograma)
+    dayPlannedSessions.forEach((ps) => {
+      const sub = subjects.find((s) => s.id === ps.subjectId);
+      allVisualItems.push({
+        id: `planned-${ps.id}`,
+        type: 'planned',
+        title: `🗓️ ${sub ? `[${sub.shortName || sub.name}] ` : ''}${ps.title} (${ps.durationMinutes}m)`,
+        icon: CalendarRange,
+        className: ps.completed
+          ? 'bg-teal-500/10 border-teal-500/20 text-teal-600 dark:text-teal-400 line-through opacity-75'
+          : 'bg-teal-500/15 border-teal-500/30 text-teal-600 dark:text-teal-400 font-semibold'
+      });
+    });
+
+    // 7. Aggregated Study (ONE item for all real sessions of this day)
     if (totalStudyMinutes > 0) {
       allVisualItems.push({
         id: `study-total-${dateStr}`,
@@ -191,7 +240,7 @@ export const CalendarView: React.FC = () => {
             Calendario
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Vista integral de exámenes, tareas, eventos, exposiciones y recordatorios
+            Vista integral de exámenes, tareas, eventos, exposiciones, recordatorios y estudio planificado
           </p>
         </div>
 
@@ -251,7 +300,7 @@ export const CalendarView: React.FC = () => {
           </h2>
         </div>
 
-        {/* Categories Legend (6 types) */}
+        {/* Categories Legend (7 types) */}
         <div className="flex flex-wrap items-center gap-2.5 text-[11px]">
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-rose-500" />
@@ -262,8 +311,12 @@ export const CalendarView: React.FC = () => {
             <span className="text-slate-500">Tarea</span>
           </div>
           <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-teal-500" />
+            <span className="text-slate-500">Planificado</span>
+          </div>
+          <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-slate-500">Estudio Agrupado</span>
+            <span className="text-slate-500">Estudio Realizado</span>
           </div>
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-purple-500" />
@@ -487,6 +540,40 @@ export const CalendarView: React.FC = () => {
                 <span className="text-xs text-slate-400">{t.dueDate}</span>
               </div>
             ))}
+
+            {/* Planned Study Sessions */}
+            {plans.flatMap((p) => getPlanSessions(p)).map((ps) => {
+              const sub = subjects.find((s) => s.id === ps.subjectId);
+              return (
+                <div
+                  key={ps.id}
+                  onClick={() => handleDayClick(ps.date)}
+                  className="p-3.5 rounded-2xl bg-teal-500/10 border border-teal-500/20 flex items-center justify-between cursor-pointer hover:border-teal-400 transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-teal-500 text-white">
+                      <CalendarRange className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm font-bold ${ps.completed ? 'line-through text-slate-400' : 'text-slate-900 dark:text-white'}`}>
+                          {ps.title}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold text-white uppercase bg-teal-500">
+                          {ps.dayPart}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-500">
+                        {sub?.name ? `Materia: ${sub.name} • ` : ''}{ps.durationMinutes} min de estudio planificado
+                      </p>
+                    </div>
+                  </div>
+                  <GlassBadge size="sm" color="#14B8A6">
+                    {ps.date}
+                  </GlassBadge>
+                </div>
+              );
+            })}
           </div>
         </GlassCard>
       )}

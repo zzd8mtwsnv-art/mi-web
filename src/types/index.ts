@@ -126,6 +126,23 @@ export interface Goal {
   subjectId?: string;
 }
 
+export type PlanType = 'examen' | 'periodo_global' | 'manual';
+export type DayPart = 'mañana' | 'tarde' | 'noche' | 'sin_hora';
+
+export interface PlannedStudySession {
+  id: string;
+  planId: string;
+  date: string; // YYYY-MM-DD
+  time?: string; // HH:mm (opcional)
+  dayPart?: DayPart; // 'mañana' | 'tarde' | 'noche' | 'sin_hora'
+  subjectId?: string;
+  title: string;
+  content: string;
+  durationMinutes: number;
+  completed?: boolean;
+  notes?: string;
+}
+
 export interface StudyPlanMilestone {
   id: string;
   dayNumber: number;
@@ -139,15 +156,21 @@ export interface StudyPlanMilestone {
 
 export interface StudyPlan {
   id: string;
-  examId?: string;
-  subjectId: string;
   title: string;
-  examDate: string;
-  difficulty: 'facil' | 'medio' | 'dificil';
-  dailyStudyMinutes: number;
-  topics: string[];
-  milestones: StudyPlanMilestone[];
+  type?: PlanType;
+  startDate?: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD
   createdAt: string;
+  examId?: string;
+  examDate?: string;
+  subjectId?: string;
+  subjectIds?: string[];
+  difficulty?: 'facil' | 'medio' | 'dificil';
+  dailyStudyMinutes?: number;
+  topics?: string[];
+  instructions?: string;
+  sessions?: PlannedStudySession[];
+  milestones?: StudyPlanMilestone[];
 }
 
 export interface NotificationItem {

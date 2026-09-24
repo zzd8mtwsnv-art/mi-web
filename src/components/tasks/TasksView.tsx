@@ -19,6 +19,20 @@ import {
   Sparkles
 } from 'lucide-react';
 
+export type TaskFilterPeriod =
+  | 'todas'
+  | 'vencidas'
+  | 'hoy'
+  | '24h'
+  | '3d'
+  | '7d'
+  | '14d'
+  | '30d'
+  | 'sin_fecha'
+  | 'completadas';
+
+export type TaskSortOption = 'proxima' | 'lejana' | 'prioridad';
+
 export const TasksView: React.FC = () => {
   const {
     tasks,
@@ -34,9 +48,10 @@ export const TasksView: React.FC = () => {
   const [selectedDetailTask, setSelectedDetailTask] = useState<Task | null>(null);
 
   // Filters State
-  const [filterPeriod, setFilterPeriod] = useState<'todas' | 'hoy' | 'semana' | 'completadas'>('todas');
+  const [filterPeriod, setFilterPeriod] = useState<TaskFilterPeriod>('todas');
   const [filterSubject, setFilterSubject] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<TaskSortOption>('proxima');
   const [searchQuery, setSearchQuery] = useState('');
 
   const todayStr = getTodayDateString();
@@ -81,36 +96,72 @@ export const TasksView: React.FC = () => {
     }
   };
 
+  // Timestamp and Overdue helpers
+  const now = new Date();
+  const nowTimestamp = now.getTime();
+  const in24hTimestamp = nowTimestamp + 24 * 60 * 60 * 1000;
+
+  const getTaskTimestamp = (t: Task): number | null => {
+    if (!t.dueDate) return null;
+    const timeStr = t.dueTime ? `${t.dueTime}:00` : '23:59:59';
+    const dateObj = new Date(`${t.dueDate}T${timeStr}`);
+    return isNaN(dateObj.getTime()) ? null : dateObj.getTime();
+  };
+
+  const isTaskOverdue = (t: Task): boolean => {
+    if (t.status === 'completada' || !t.dueDate) return false;
+    const taskTs = getTaskTimestamp(t);
+    if (!taskTs) return false;
+    return taskTs < nowTimestamp;
+  };
+
   // Filter Tasks
   const filteredTasks = tasks.filter((t) => {
-    // Period filter
-    if (filterPeriod === 'hoy') {
-      if (t.dueDate !== todayStr) return false;
-    } else if (filterPeriod === 'semana') {
-      const nextWeek = new Date();
-      nextWeek.setDate(nextWeek.getDate() + 7);
-      const nextWeekStr = nextWeek.toISOString().split('T')[0];
-      if (t.dueDate < todayStr || t.dueDate > nextWeekStr) return false;
-    } else if (filterPeriod === 'completadas') {
-      if (t.status !== 'completada') return false;
+    const isDone = t.status === 'completada';
+    const taskTs = getTaskTimestamp(t);
+    const overdue = isTaskOverdue(t);
+
+    // 1. Period filter
+    if (filterPeriod === 'completadas') {
+      if (!isDone) return false;
+    } else if (filterPeriod === 'vencidas') {
+      if (!overdue) return false;
+    } else {
+      // Exclude completed tasks from all pending period filters
+      if (isDone) return false;
+
+      if (filterPeriod === 'hoy') {
+        if (t.dueDate !== todayStr) return false;
+      } else if (filterPeriod === '24h') {
+        if (!taskTs || taskTs < nowTimestamp || taskTs > in24hTimestamp) return false;
+      } else if (filterPeriod === '3d') {
+        const in3dStr = new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0];
+        if (!t.dueDate || t.dueDate < todayStr || t.dueDate > in3dStr) return false;
+      } else if (filterPeriod === '7d') {
+        const in7dStr = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+        if (!t.dueDate || t.dueDate < todayStr || t.dueDate > in7dStr) return false;
+      } else if (filterPeriod === '14d') {
+        const in14dStr = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0];
+        if (!t.dueDate || t.dueDate < todayStr || t.dueDate > in14dStr) return false;
+      } else if (filterPeriod === '30d') {
+        const in30dStr = new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0];
+        if (!t.dueDate || t.dueDate < todayStr || t.dueDate > in30dStr) return false;
+      } else if (filterPeriod === 'sin_fecha') {
+        if (t.dueDate) return false;
+      }
     }
 
-    // Hide completed in normal filters unless selected
-    if (filterPeriod !== 'completadas' && t.status === 'completada') {
-      return false;
-    }
-
-    // Subject filter
+    // 2. Subject filter
     if (filterSubject !== 'all' && t.subjectId !== filterSubject) {
       return false;
     }
 
-    // Priority filter
+    // 3. Priority filter
     if (filterPriority !== 'all' && t.priority !== filterPriority) {
       return false;
     }
 
-    // Search query
+    // 4. Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchTitle = t.title.toLowerCase().includes(q);
@@ -119,6 +170,33 @@ export const TasksView: React.FC = () => {
     }
 
     return true;
+  });
+
+  // Sorting
+  const priorityWeight: Record<Priority, number> = {
+    urgente: 4,
+    alta: 3,
+    media: 2,
+    baja: 1
+  };
+
+  const sortedTasks = [...filteredTasks].sort((a, b) => {
+    if (sortBy === 'prioridad') {
+      const pDiff = (priorityWeight[b.priority] || 0) - (priorityWeight[a.priority] || 0);
+      if (pDiff !== 0) return pDiff;
+      const tsA = getTaskTimestamp(a) ?? Infinity;
+      const tsB = getTaskTimestamp(b) ?? Infinity;
+      return tsA - tsB;
+    } else if (sortBy === 'lejana') {
+      const tsA = getTaskTimestamp(a) ?? -Infinity;
+      const tsB = getTaskTimestamp(b) ?? -Infinity;
+      return tsB - tsA;
+    } else {
+      // 'proxima'
+      const tsA = getTaskTimestamp(a) ?? Infinity;
+      const tsB = getTaskTimestamp(b) ?? Infinity;
+      return tsA - tsB;
+    }
   });
 
   return (
@@ -130,7 +208,7 @@ export const TasksView: React.FC = () => {
             Tareas & Deberes
           </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">
-            Gestiona tus entregas, ejercicios y proyectos de Bachillerato
+            Gestiona tus entregas, ejercicios y proyectos de Bachillerato con filtros por tiempo restante
           </p>
         </div>
 
@@ -179,18 +257,24 @@ export const TasksView: React.FC = () => {
       </GlassCard>
 
       {/* Filters & Search Row */}
-      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
-        {/* Period Pills */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-white/10 overflow-x-auto">
+      <div className="space-y-3">
+        {/* Period Pills Bar (Full responsive horizontal scrolling) */}
+        <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-slate-100/80 dark:bg-slate-900/60 border border-slate-200/50 dark:border-white/10 overflow-x-auto scrollbar-none">
           {[
-            { id: 'todas', label: 'Pendientes' },
-            { id: 'hoy', label: 'Para Hoy' },
-            { id: 'semana', label: 'Próximos 7 días' },
+            { id: 'todas', label: 'Todas' },
+            { id: 'vencidas', label: 'Vencidas' },
+            { id: 'hoy', label: 'Hoy' },
+            { id: '24h', label: 'Próx. 24h' },
+            { id: '3d', label: 'Próx. 3 días' },
+            { id: '7d', label: 'Próx. 7 días' },
+            { id: '14d', label: 'Próx. 14 días' },
+            { id: '30d', label: 'Próx. 30 días' },
+            { id: 'sin_fecha', label: 'Sin fecha' },
             { id: 'completadas', label: 'Completadas' }
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setFilterPeriod(tab.id as any)}
+              onClick={() => setFilterPeriod(tab.id as TaskFilterPeriod)}
               className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all ${
                 filterPeriod === tab.id
                   ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm'
@@ -202,9 +286,53 @@ export const TasksView: React.FC = () => {
           ))}
         </div>
 
-        {/* Search & Subject dropdowns */}
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
-          <div className="relative flex-1 sm:w-56">
+        {/* Dropdowns Row: Sort, Subject, Priority & Search */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Sort by */}
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+              <span className="font-semibold text-[11px] uppercase tracking-wider">Ordenar:</span>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as TaskSortOption)}
+                className="text-xs rounded-xl glass-input px-3 py-1.5 font-medium"
+              >
+                <option value="proxima">Fecha más próxima</option>
+                <option value="lejana">Fecha más lejana</option>
+                <option value="prioridad">Prioridad (Urgente primero)</option>
+              </select>
+            </div>
+
+            {/* Subject */}
+            <select
+              value={filterSubject}
+              onChange={(e) => setFilterSubject(e.target.value)}
+              className="text-xs rounded-xl glass-input px-3 py-1.5 font-medium"
+            >
+              <option value="all">Todas las materias</option>
+              {subjects.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Priority */}
+            <select
+              value={filterPriority}
+              onChange={(e) => setFilterPriority(e.target.value)}
+              className="text-xs rounded-xl glass-input px-3 py-1.5 font-medium"
+            >
+              <option value="all">Todas las prioridades</option>
+              <option value="urgente">Urgente</option>
+              <option value="alta">Alta</option>
+              <option value="media">Media</option>
+              <option value="baja">Baja</option>
+            </select>
+          </div>
+
+          {/* Search Query */}
+          <div className="relative w-full sm:w-56">
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input
               type="text"
@@ -214,25 +342,12 @@ export const TasksView: React.FC = () => {
               className="w-full pl-9 pr-3 py-1.5 rounded-xl glass-input text-xs"
             />
           </div>
-
-          <select
-            value={filterSubject}
-            onChange={(e) => setFilterSubject(e.target.value)}
-            className="text-xs rounded-xl glass-input px-3 py-1.5"
-          >
-            <option value="all">Todas las materias</option>
-            {subjects.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 
       {/* Task Cards List */}
       <div className="space-y-3">
-        {filteredTasks.length === 0 ? (
+        {sortedTasks.length === 0 ? (
           <GlassCard padding="lg" className="text-center py-12">
             <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800/80 mx-auto flex items-center justify-center mb-3 text-slate-400">
               <CheckSquare className="w-6 h-6" />
@@ -245,7 +360,7 @@ export const TasksView: React.FC = () => {
             </p>
           </GlassCard>
         ) : (
-          filteredTasks.map((t) => {
+          sortedTasks.map((t) => {
             const sub = subjects.find((s) => s.id === t.subjectId);
             const isDone = t.status === 'completada';
 
