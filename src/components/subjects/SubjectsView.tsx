@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { Subject } from '../../types';
 import { GlassCard } from '../ui/GlassCard';
@@ -394,7 +394,7 @@ export const SubjectsView: React.FC = () => {
                       {g.title}
                     </h4>
                     <span className="text-[11px] text-slate-400 capitalize">
-                      {g.category} • Peso: {g.weightPercentage}%
+                      {g.category} • {g.weightPercentage !== undefined && g.weightPercentage !== null && Number(g.weightPercentage) > 0 ? `Peso: ${g.weightPercentage}%` : 'Sin ponderación'}
                     </span>
                   </div>
                   <div className="text-right">

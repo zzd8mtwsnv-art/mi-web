@@ -109,7 +109,7 @@ export interface GradeItem {
   category: GradeCategory;
   score: number;
   maxScore: number;
-  weightPercentage: number;
+  weightPercentage?: number;
   date: string; // YYYY-MM-DD
 }
 

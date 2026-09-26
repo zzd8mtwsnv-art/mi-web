@@ -626,16 +626,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const sub = subjects.find((s) => s.id === subjectId);
       return sub?.currentAverage || 0;
     }
-    const totalWeight = subGrades.reduce((acc, g) => acc + g.weightPercentage, 0);
-    if (totalWeight === 0) {
-      const sum = subGrades.reduce((acc, g) => acc + (g.score / g.maxScore) * 10, 0);
-      return Number((sum / subGrades.length).toFixed(2));
-    }
-    const weightedSum = subGrades.reduce(
-      (acc, g) => acc + ((g.score / g.maxScore) * 10 * g.weightPercentage),
-      0
+    const weightedGrades = subGrades.filter(
+      (g) => g.weightPercentage !== undefined && g.weightPercentage !== null && Number(g.weightPercentage) > 0
     );
-    return Number((weightedSum / totalWeight).toFixed(2));
+    const totalWeight = weightedGrades.reduce((acc, g) => acc + Number(g.weightPercentage || 0), 0);
+    
+    if (weightedGrades.length > 0 && totalWeight > 0) {
+      const weightedSum = weightedGrades.reduce(
+        (acc, g) => acc + ((g.score / g.maxScore) * 10 * Number(g.weightPercentage || 0)),
+        0
+      );
+      return Number((weightedSum / totalWeight).toFixed(2));
+    }
+    
+    const sum = subGrades.reduce((acc, g) => acc + (g.score / g.maxScore) * 10, 0);
+    return Number((sum / subGrades.length).toFixed(2));
   };
 
   const globalAverageGrade = (() => {
@@ -813,14 +818,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const addGradeItem = (grade: Omit<GradeItem, 'id'>) => {
     const newGrade: GradeItem = {
-      ...grade,
+      subjectId: grade.subjectId,
+      title: grade.title,
+      category: grade.category,
+      score: grade.score,
+      maxScore: grade.maxScore,
+      date: grade.date,
+      ...(grade.weightPercentage !== undefined && grade.weightPercentage !== null && Number(grade.weightPercentage) > 0
+        ? { weightPercentage: Number(grade.weightPercentage) }
+        : {}),
       id: `gr-${Date.now()}`
     };
     setGrades((prev) => [...prev, newGrade]);
   };
 
   const updateGradeItem = (id: string, gradeData: Partial<GradeItem>) => {
-    setGrades((prev) => prev.map((g) => (g.id === id ? { ...g, ...gradeData } : g)));
+    setGrades((prev) =>
+      prev.map((g) => {
+        if (g.id !== id) return g;
+        const updated: GradeItem = {
+          id: g.id,
+          subjectId: gradeData.subjectId ?? g.subjectId,
+          title: gradeData.title ?? g.title,
+          category: gradeData.category ?? g.category,
+          score: gradeData.score ?? g.score,
+          maxScore: gradeData.maxScore ?? g.maxScore,
+          date: gradeData.date ?? g.date,
+          ...(gradeData.weightPercentage !== undefined && gradeData.weightPercentage !== null && Number(gradeData.weightPercentage) > 0
+            ? { weightPercentage: Number(gradeData.weightPercentage) }
+            : {})
+        };
+        return updated;
+      })
+    );
   };
 
   const deleteGradeItem = (id: string) => {
