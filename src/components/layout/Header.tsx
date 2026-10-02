@@ -73,17 +73,17 @@ export const Header: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-20 w-full px-4 sm:px-6 py-3 select-none">
-      <div className="flex items-center justify-between gap-3 max-w-7xl mx-auto rounded-2xl glass-panel px-4 py-2.5 border border-white/60 dark:border-white/10 shadow-lg shadow-indigo-950/5">
+    <header className="sticky top-0 z-20 w-full px-3 sm:px-6 py-2 sm:py-3 pt-safe select-none">
+      <div className="flex items-center justify-between gap-2 sm:gap-3 max-w-7xl mx-auto rounded-2xl glass-panel px-3 sm:px-4 py-2 sm:py-2.5 border border-white/60 dark:border-white/10 shadow-lg shadow-indigo-950/5">
         {/* Left: Search Trigger Bar */}
-        <div className="flex items-center gap-3 flex-1 max-w-md">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0 max-w-md">
           <button
             onClick={() => setIsSearchOpen(true)}
-            className="flex items-center gap-3 w-full px-3.5 py-1.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 border border-slate-200/60 dark:border-white/10 text-xs sm:text-sm text-slate-500 dark:text-slate-400 transition-all text-left group"
+            className="flex items-center gap-2 sm:gap-3 w-full px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-slate-100/70 dark:bg-slate-800/60 hover:bg-slate-200/70 dark:hover:bg-slate-700/60 border border-slate-200/60 dark:border-white/10 text-xs sm:text-sm text-slate-500 dark:text-slate-400 transition-all text-left group min-w-0"
           >
-            <Search className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors" />
-            <span className="flex-1 truncate">Buscar asignaturas, tareas, exámenes, eventos...</span>
-            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono bg-white/80 dark:bg-slate-900/80 rounded-md border border-slate-300/60 dark:border-white/10 text-slate-500">
+            <Search className="w-4 h-4 text-slate-400 group-hover:text-indigo-500 transition-colors shrink-0" />
+            <span className="flex-1 truncate">Buscar en StudyFlow...</span>
+            <kbd className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-mono bg-white/80 dark:bg-slate-900/80 rounded-md border border-slate-300/60 dark:border-white/10 text-slate-500 shrink-0">
               ⌘K
             </kbd>
           </button>

@@ -83,17 +83,17 @@ const MainContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col lg:flex-row bg-slate-50 dark:bg-[#080d1a] bg-mesh-light dark:bg-mesh-dark text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    <div className="min-h-screen w-full overflow-x-hidden flex flex-col lg:flex-row bg-slate-50 dark:bg-[#080d1a] bg-mesh-light dark:bg-mesh-dark text-slate-900 dark:text-slate-100 transition-colors duration-300">
       {/* Desktop Liquid Glass Sidebar */}
       <Sidebar />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 pb-20 lg:pb-8">
+      <div className="flex-1 flex flex-col min-w-0 max-w-full pb-24 lg:pb-8 overflow-x-hidden">
         {/* Floating Top Header Bar */}
         <Header />
 
         {/* Dynamic Page View */}
-        <main className="flex-1 px-4 sm:px-8 pt-4 sm:pt-6">
+        <main className="flex-1 px-3 sm:px-6 lg:px-8 pt-2 sm:pt-4 max-w-full min-w-0">
           {renderActiveView()}
         </main>
       </div>

@@ -204,7 +204,7 @@ export const SubjectsView: React.FC = () => {
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex items-center gap-2 p-1.5 rounded-2xl glass-panel border border-white/60 dark:border-white/10 overflow-x-auto">
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl glass-panel border border-white/60 dark:border-white/10 overflow-x-auto scrollbar-none">
             {(['resumen', 'tareas', 'examenes', 'notas', 'apuntes'] as const).map((tab) => (
               <button
                 key={tab}

@@ -230,6 +230,26 @@ export const CalendarView: React.FC = () => {
   };
 
   const todayStr = new Date().toISOString().split('T')[0];
+  const [selectedMobileDate, setSelectedMobileDate] = useState<string>(todayStr);
+
+  // Helper for mobile dots (max 4 distinct colored dots)
+  const getDayDots = (dateStr: string) => {
+    const hasExam = exams.some((e) => e.date === dateStr);
+    const hasTask = tasks.some((t) => t.dueDate === dateStr);
+    const hasStudy = sessions.some((s) => s.date.startsWith(dateStr));
+    const hasCustom = customEvents.some((ev) => ev.date === dateStr);
+    const hasPlan = plans.some((p) => getPlanSessions(p).some((ps) => ps.date === dateStr));
+
+    const dots: string[] = [];
+    if (hasExam) dots.push('bg-rose-500');
+    if (hasTask) dots.push('bg-indigo-500');
+    if (hasPlan) dots.push('bg-teal-500');
+    if (hasStudy) dots.push('bg-emerald-500');
+    if (hasCustom && dots.length < 4) dots.push('bg-purple-500');
+    return dots.slice(0, 4);
+  };
+
+  const selectedDayItemsMobile = getDayItems(selectedMobileDate);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
@@ -245,8 +265,8 @@ export const CalendarView: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* View Mode Toggle */}
-          <div className="flex items-center p-1 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-white/10">
+          {/* View Mode Toggle (Desktop) */}
+          <div className="hidden sm:flex items-center p-1 rounded-2xl bg-white/60 dark:bg-slate-800/60 border border-slate-200/50 dark:border-white/10">
             {(['month', 'week', 'day'] as const).map((mode) => (
               <button
                 key={mode}
@@ -265,7 +285,7 @@ export const CalendarView: React.FC = () => {
           <GlassButton
             variant="primary"
             size="sm"
-            onClick={() => handleOpenAddEventForDate(todayStr)}
+            onClick={() => handleOpenAddEventForDate(selectedMobileDate || todayStr)}
             icon={<Plus className="w-4 h-4" />}
           >
             Nuevo Evento
@@ -289,7 +309,10 @@ export const CalendarView: React.FC = () => {
             <ChevronRight className="w-4 h-4" />
           </button>
           <button
-            onClick={handleToday}
+            onClick={() => {
+              handleToday();
+              setSelectedMobileDate(todayStr);
+            }}
             className="px-3 py-1.5 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 font-semibold text-xs border border-indigo-200/50 dark:border-indigo-500/20"
           >
             Hoy
@@ -300,8 +323,8 @@ export const CalendarView: React.FC = () => {
           </h2>
         </div>
 
-        {/* Categories Legend (7 types) */}
-        <div className="flex flex-wrap items-center gap-2.5 text-[11px]">
+        {/* Categories Legend */}
+        <div className="flex flex-wrap items-center gap-2 text-[10px] sm:text-[11px]">
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-rose-500" />
             <span className="text-slate-500">Examen</span>
@@ -320,122 +343,242 @@ export const CalendarView: React.FC = () => {
           </div>
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-purple-500" />
-            <span className="text-slate-500">Evento</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-amber-500" />
-            <span className="text-slate-500">Exposición</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-cyan-500" />
-            <span className="text-slate-500">Recordatorio</span>
+            <span className="text-slate-500">Evento / Expo / Recordatorio</span>
           </div>
         </div>
       </div>
 
-      {/* MONTH VIEW */}
-      {viewMode === 'month' && (
-        <GlassCard padding="none" className="overflow-hidden shadow-xl">
-          {/* Days of week header */}
-          <div className="grid grid-cols-7 border-b border-slate-200/60 dark:border-white/10 bg-slate-100/50 dark:bg-slate-900/50 text-center py-2.5 text-xs font-bold text-slate-500">
-            <span className="hidden sm:inline">Lun</span>
-            <span className="sm:hidden">L</span>
-            <span className="hidden sm:inline">Mar</span>
-            <span className="sm:hidden">M</span>
-            <span className="hidden sm:inline">Mié</span>
-            <span className="sm:hidden">X</span>
-            <span className="hidden sm:inline">Jue</span>
-            <span className="sm:hidden">J</span>
-            <span className="hidden sm:inline">Vie</span>
-            <span className="sm:hidden">V</span>
-            <span className="text-rose-500/80 hidden sm:inline">Sáb</span>
-            <span className="text-rose-500/80 sm:hidden">S</span>
-            <span className="text-rose-500/80 hidden sm:inline">Dom</span>
-            <span className="text-rose-500/80 sm:hidden">D</span>
+      {/* MOBILE EXPERIENCE (< md): Compact Dot Matrix + Selected Day Agenda */}
+      <div className="md:hidden space-y-4">
+        {/* Compact Monthly Dot Matrix */}
+        <GlassCard padding="none" className="overflow-hidden shadow-lg">
+          {/* Day of week abbreviations */}
+          <div className="grid grid-cols-7 border-b border-slate-200/60 dark:border-white/10 bg-slate-100/60 dark:bg-slate-900/60 text-center py-2 text-[11px] font-bold text-slate-500">
+            <span>L</span>
+            <span>M</span>
+            <span>X</span>
+            <span>J</span>
+            <span>V</span>
+            <span className="text-rose-500/80">S</span>
+            <span className="text-rose-500/80">D</span>
           </div>
 
-          {/* Grid Cells (Uniform Height & Clean Layout) */}
+          {/* Compact matrix cells */}
           <div className="grid grid-cols-7 divide-x divide-y divide-slate-200/40 dark:divide-white/5">
             {calendarCells.map((cell, index) => {
               if (!cell) {
                 return (
                   <div
-                    key={`empty-${index}`}
-                    className="min-h-[100px] sm:min-h-[120px] bg-slate-100/20 dark:bg-slate-900/20"
+                    key={`empty-mob-${index}`}
+                    className="h-12 bg-slate-100/10 dark:bg-slate-900/10"
                   />
                 );
               }
 
-              const { visibleItems, extraCount } = getDayItems(cell.dateStr);
+              const isSelected = cell.dateStr === selectedMobileDate;
               const isToday = cell.dateStr === todayStr;
+              const dots = getDayDots(cell.dateStr);
 
               return (
-                <div
-                  key={cell.dateStr}
-                  onClick={() => handleDayClick(cell.dateStr)}
-                  className={`
-                    min-h-[100px] sm:min-h-[120px] max-h-[145px] p-1.5 sm:p-2 transition-all cursor-pointer group hover:bg-indigo-50/50 dark:hover:bg-slate-800/50 flex flex-col justify-between overflow-hidden
-                    ${isToday ? 'bg-indigo-500/5' : ''}
-                  `}
+                <button
+                  key={`mob-${cell.dateStr}`}
+                  onClick={() => setSelectedMobileDate(cell.dateStr)}
+                  className={`h-12 p-1 flex flex-col items-center justify-between transition-all relative ${
+                    isSelected
+                      ? 'bg-indigo-500/15 font-bold'
+                      : isToday
+                      ? 'bg-indigo-500/5'
+                      : 'hover:bg-slate-100/50 dark:hover:bg-slate-800/40'
+                  }`}
                 >
-                  <div>
-                    {/* Day number & hover Add icon */}
-                    <div className="flex items-center justify-between mb-1">
-                      <span
-                        className={`
-                          w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all
-                          ${
-                            isToday
-                              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30'
-                              : 'text-slate-700 dark:text-slate-300 group-hover:text-indigo-600'
-                          }
-                        `}
-                      >
-                        {cell.dayNumber}
-                      </span>
+                  <span
+                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs transition-all ${
+                      isSelected
+                        ? 'bg-indigo-600 text-white font-bold shadow-md shadow-indigo-500/30'
+                        : isToday
+                        ? 'bg-indigo-100 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 font-extrabold'
+                        : 'text-slate-700 dark:text-slate-300 font-medium'
+                    }`}
+                  >
+                    {cell.dayNumber}
+                  </span>
 
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenAddEventForDate(cell.dateStr);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-indigo-500 p-0.5 rounded hover:bg-indigo-100/50 transition-opacity"
-                        title="Añadir evento a este día"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-
-                    {/* Max 3 visible items */}
-                    <div className="space-y-1">
-                      {visibleItems.map((item) => {
-                        const Icon = item.icon;
-                        return (
-                          <div
-                            key={item.id}
-                            className={`px-1.5 py-0.5 rounded-md border text-[10px] truncate flex items-center gap-1 ${item.className}`}
-                          >
-                            <Icon className="w-2.5 h-2.5 shrink-0" />
-                            <span className="truncate">{item.title}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
+                  {/* Colored Dots row */}
+                  <div className="flex items-center gap-0.5 min-h-[4px] mb-0.5">
+                    {dots.map((dotColor, idx) => (
+                      <span key={idx} className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />
+                    ))}
                   </div>
-
-                  {/* "+X más" Badge if more than 3 items */}
-                  {extraCount > 0 && (
-                    <div className="mt-1 text-right">
-                      <span className="inline-block px-1.5 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 hover:text-indigo-600 transition-colors">
-                        +{extraCount} más
-                      </span>
-                    </div>
-                  )}
-                </div>
+                </button>
               );
             })}
           </div>
         </GlassCard>
+
+        {/* Selected Day Agenda Breakdown */}
+        <GlassCard padding="md" className="space-y-3.5 shadow-lg">
+          <div className="flex items-center justify-between border-b border-slate-200/50 dark:border-white/10 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-extrabold text-slate-900 dark:text-white">
+                  Agenda del Día
+                </h3>
+                {selectedMobileDate === todayStr && (
+                  <span className="px-2 py-0.5 text-[10px] font-extrabold bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 rounded-md">
+                    HOY
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                {selectedMobileDate} • {selectedDayItemsMobile.totalCount} {selectedDayItemsMobile.totalCount === 1 ? 'actividad' : 'actividades'}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => handleDayClick(selectedMobileDate)}
+                className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 text-xs font-semibold hover:bg-slate-200"
+              >
+                Ficha completa
+              </button>
+              <button
+                onClick={() => handleOpenAddEventForDate(selectedMobileDate)}
+                className="p-1.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-500/20"
+                title="Añadir evento a este día"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Activities List */}
+          <div className="space-y-2">
+            {selectedDayItemsMobile.allVisualItems.length === 0 ? (
+              <div className="text-center py-6 text-xs text-slate-400">
+                No hay actividades ni tareas programadas para este día.
+              </div>
+            ) : (
+              selectedDayItemsMobile.allVisualItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleDayClick(selectedMobileDate)}
+                    className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 cursor-pointer active:scale-[0.99] transition-all ${item.className}`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon className="w-4 h-4 shrink-0" />
+                      <span className="font-semibold truncate">{item.title}</span>
+                    </div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider opacity-75 shrink-0">
+                      {item.type}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </GlassCard>
+      </div>
+
+      {/* DESKTOP VIEW (md+): Full Calendar Grid */}
+      {viewMode === 'month' && (
+        <div className="hidden md:block">
+          <GlassCard padding="none" className="overflow-hidden shadow-xl">
+            {/* Days of week header */}
+            <div className="grid grid-cols-7 border-b border-slate-200/60 dark:border-white/10 bg-slate-100/50 dark:bg-slate-900/50 text-center py-2.5 text-xs font-bold text-slate-500">
+              <span>Lun</span>
+              <span>Mar</span>
+              <span>Mié</span>
+              <span>Jue</span>
+              <span>Vie</span>
+              <span className="text-rose-500/80">Sáb</span>
+              <span className="text-rose-500/80">Dom</span>
+            </div>
+
+            {/* Grid Cells (Uniform Height & Clean Layout) */}
+            <div className="grid grid-cols-7 divide-x divide-y divide-slate-200/40 dark:divide-white/5">
+              {calendarCells.map((cell, index) => {
+                if (!cell) {
+                  return (
+                    <div
+                      key={`empty-${index}`}
+                      className="min-h-[100px] sm:min-h-[120px] bg-slate-100/20 dark:bg-slate-900/20"
+                    />
+                  );
+                }
+
+                const { visibleItems, extraCount } = getDayItems(cell.dateStr);
+                const isToday = cell.dateStr === todayStr;
+
+                return (
+                  <div
+                    key={cell.dateStr}
+                    onClick={() => handleDayClick(cell.dateStr)}
+                    className={`
+                      min-h-[100px] sm:min-h-[120px] max-h-[145px] p-1.5 sm:p-2 transition-all cursor-pointer group hover:bg-indigo-50/50 dark:hover:bg-slate-800/50 flex flex-col justify-between overflow-hidden
+                      ${isToday ? 'bg-indigo-500/5' : ''}
+                    `}
+                  >
+                    <div>
+                      {/* Day number & hover Add icon */}
+                      <div className="flex items-center justify-between mb-1">
+                        <span
+                          className={`
+                            w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all
+                            ${
+                              isToday
+                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/30'
+                                : 'text-slate-700 dark:text-slate-300 group-hover:text-indigo-600'
+                            }
+                          `}
+                        >
+                          {cell.dayNumber}
+                        </span>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenAddEventForDate(cell.dateStr);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-indigo-500 p-0.5 rounded hover:bg-indigo-100/50 transition-opacity"
+                          title="Añadir evento a este día"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+
+                      {/* Max 3 visible items */}
+                      <div className="space-y-1">
+                        {visibleItems.map((item) => {
+                          const Icon = item.icon;
+                          return (
+                            <div
+                              key={item.id}
+                              className={`px-1.5 py-0.5 rounded-md border text-[10px] truncate flex items-center gap-1 ${item.className}`}
+                            >
+                              <Icon className="w-2.5 h-2.5 shrink-0" />
+                              <span className="truncate">{item.title}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* "+X más" Badge if more than 3 items */}
+                    {extraCount > 0 && (
+                      <div className="mt-1 text-right">
+                        <span className="inline-block px-1.5 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800 text-[10px] font-bold text-slate-600 dark:text-slate-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/60 hover:text-indigo-600 transition-colors">
+                          +{extraCount} más
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </GlassCard>
+        </div>
       )}
 
       {/* WEEK & DAY VIEWS (Detailed List with Event Types) */}

@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../ui/GlassCard';
 import { formatMinutes } from '../../utils/dateUtils';
@@ -239,10 +239,13 @@ export const StatsView: React.FC = () => {
 
       {/* 30-Day Activity Heatmap */}
       <GlassCard padding="lg" className="space-y-3">
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-          Registro de Constancia (Últimos 30 días)
-        </h3>
-        <div className="grid grid-cols-6 sm:grid-cols-10 md:grid-cols-15 gap-2 pt-2">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+            Registro de Constancia (Últimos 30 días)
+          </h3>
+          <span className="text-xs text-slate-400">Días con estudio</span>
+        </div>
+        <div className="grid grid-cols-6 sm:grid-cols-10 gap-1.5 sm:gap-2 pt-2">
           {Array.from({ length: 30 }).map((_, i) => {
             const d = new Date();
             d.setDate(d.getDate() - (29 - i));
@@ -253,7 +256,7 @@ export const StatsView: React.FC = () => {
               <div
                 key={dateStr}
                 title={`${dateStr}: ${hasStudy ? 'Estudiado' : 'Sin registro'}`}
-                className={`h-7 rounded-xl flex items-center justify-center text-[10px] font-mono font-bold transition-transform hover:scale-110 cursor-pointer ${
+                className={`h-7 sm:h-8 rounded-xl flex items-center justify-center text-[10px] sm:text-xs font-mono font-bold transition-transform hover:scale-105 cursor-pointer ${
                   hasStudy
                     ? 'bg-indigo-500 text-white shadow-sm shadow-indigo-500/25'
                     : 'bg-slate-100 dark:bg-slate-800 text-slate-400'

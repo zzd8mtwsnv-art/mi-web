@@ -287,15 +287,15 @@ export const TasksView: React.FC = () => {
         </div>
 
         {/* Dropdowns Row: Sort, Subject, Priority & Search */}
-        <div className="flex flex-wrap items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
             {/* Sort by */}
             <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
-              <span className="font-semibold text-[11px] uppercase tracking-wider">Ordenar:</span>
+              <span className="font-semibold text-[11px] uppercase tracking-wider shrink-0">Ordenar:</span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as TaskSortOption)}
-                className="text-xs rounded-xl glass-input px-3 py-1.5 font-medium"
+                className="text-xs rounded-xl glass-input px-2.5 py-1.5 font-medium max-w-[180px] truncate"
               >
                 <option value="proxima">Fecha más próxima</option>
                 <option value="lejana">Fecha más lejana</option>
@@ -307,7 +307,7 @@ export const TasksView: React.FC = () => {
             <select
               value={filterSubject}
               onChange={(e) => setFilterSubject(e.target.value)}
-              className="text-xs rounded-xl glass-input px-3 py-1.5 font-medium"
+              className="text-xs rounded-xl glass-input px-2.5 py-1.5 font-medium max-w-[150px] truncate"
             >
               <option value="all">Todas las materias</option>
               {subjects.map((s) => (
@@ -321,7 +321,7 @@ export const TasksView: React.FC = () => {
             <select
               value={filterPriority}
               onChange={(e) => setFilterPriority(e.target.value)}
-              className="text-xs rounded-xl glass-input px-3 py-1.5 font-medium"
+              className="text-xs rounded-xl glass-input px-2.5 py-1.5 font-medium max-w-[140px] truncate"
             >
               <option value="all">Todas las prioridades</option>
               <option value="urgente">Urgente</option>
@@ -332,8 +332,8 @@ export const TasksView: React.FC = () => {
           </div>
 
           {/* Search Query */}
-          <div className="relative w-full sm:w-56">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="relative w-full sm:w-56 shrink-0">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
@@ -373,7 +373,7 @@ export const TasksView: React.FC = () => {
                   isDone ? 'opacity-65' : ''
                 }`}
               >
-                <div className="flex items-start gap-3.5 min-w-0">
+                <div className="flex items-start gap-3.5 min-w-0 flex-1">
                   <input
                     type="checkbox"
                     checked={isDone}
@@ -381,9 +381,9 @@ export const TasksView: React.FC = () => {
                     onChange={() => toggleTaskComplete(t.id)}
                     className="w-5 h-5 mt-0.5 text-indigo-600 rounded-lg border-slate-300 focus:ring-indigo-500 cursor-pointer shrink-0"
                   />
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h3
-                      className={`text-sm sm:text-base font-semibold ${
+                      className={`text-sm sm:text-base font-semibold break-words ${
                         isDone
                           ? 'line-through text-slate-400 dark:text-slate-500'
                           : 'text-slate-900 dark:text-white'

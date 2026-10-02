@@ -1,4 +1,4 @@
-﻿import React, { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 
@@ -45,7 +45,7 @@ export const GlassModal: React.FC<GlassModalProps> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
           {/* Backdrop Blur */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -63,40 +63,43 @@ export const GlassModal: React.FC<GlassModalProps> = ({
             exit={{ opacity: 0, scale: 0.95, y: 15 }}
             transition={{ type: 'spring', damping: 25, stiffness: 350 }}
             className={`
-              relative w-full ${maxWClass} my-8 z-10
-              bg-white/85 dark:bg-[#131b2e]/90
+              relative w-full ${maxWClass} my-auto z-10
+              max-h-[92vh] sm:max-h-[85vh] flex flex-col
+              bg-white/90 dark:bg-[#131b2e]/95
               backdrop-blur-2xl
               border border-white/60 dark:border-white/15
               shadow-2xl shadow-indigo-500/10
-              rounded-3xl p-6 sm:p-8
+              rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-8
               overflow-hidden
             `}
           >
             {/* Top glass sheen */}
-            <div className="absolute top-0 left-8 right-8 h-[1px] bg-gradient-to-r from-transparent via-white/60 dark:via-white/20 to-transparent pointer-events-none" />
+            <div className="absolute top-0 left-6 right-6 h-[1px] bg-gradient-to-r from-transparent via-white/60 dark:via-white/20 to-transparent pointer-events-none" />
 
             {/* Header */}
-            <div className="flex items-start justify-between mb-6">
-              <div>
-                <h3 className="text-xl font-bold text-slate-900 dark:text-white tracking-tight">
+            <div className="flex items-start justify-between mb-4 sm:mb-6 shrink-0">
+              <div className="min-w-0 pr-2">
+                <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white tracking-tight truncate">
                   {title}
                 </h3>
                 {subtitle && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 sm:mt-1">
                     {subtitle}
                   </p>
                 )}
               </div>
               <button
                 onClick={onClose}
-                className="p-2 rounded-2xl bg-slate-100/70 dark:bg-slate-800/70 hover:bg-slate-200/80 dark:hover:bg-slate-700/80 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-all"
+                className="p-2 rounded-xl sm:rounded-2xl bg-slate-100/80 dark:bg-slate-800/80 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white transition-all shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             {/* Body */}
-            <div>{children}</div>
+            <div className="flex-1 min-h-0 overflow-y-auto pr-1 -mr-1 overscroll-contain">
+              {children}
+            </div>
           </motion.div>
         </div>
       )}
