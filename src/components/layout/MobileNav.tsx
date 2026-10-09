@@ -162,9 +162,11 @@ export const MobileNav: React.FC = () => {
               {/* Header */}
               <div className="px-5 pb-3 pt-1 flex items-center justify-between border-b border-slate-200/60 dark:border-white/10 shrink-0">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shadow-md">
-                    SF
-                  </div>
+                  <img
+                    src="/studyflow-logo.png"
+                    alt="StudyFlow"
+                    className="w-8 h-8 object-contain shrink-0 drop-shadow-sm select-none pointer-events-none"
+                  />
                   <div>
                     <h3 className="text-base font-extrabold text-slate-900 dark:text-white leading-tight">
                       Todas las Secciones

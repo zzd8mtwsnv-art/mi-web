@@ -40,9 +40,11 @@ export const Sidebar: React.FC = () => {
         {/* Brand Header */}
         <div className="flex items-center justify-between px-3 py-2 mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-pink-500 flex items-center justify-center shadow-md shadow-indigo-500/25">
-              <Sparkles className="w-4 h-4 text-white" />
-            </div>
+            <img
+              src="/studyflow-logo.png"
+              alt="StudyFlow"
+              className="w-8 h-8 object-contain shrink-0 drop-shadow-sm select-none pointer-events-none"
+            />
             <div>
               <span className="text-base font-bold tracking-tight bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-700 dark:from-white dark:via-indigo-200 dark:to-slate-300 bg-clip-text text-transparent">
                 StudyFlow

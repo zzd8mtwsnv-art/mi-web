@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { GlassCard } from '../ui/GlassCard';
-import { GlassButton } from '../ui/GlassButton';
-import { Sparkles, AlertCircle, ShieldCheck, Cloud, Laptop, HelpCircle } from 'lucide-react';
+import { AlertCircle, ShieldCheck, Cloud, Laptop, HelpCircle } from 'lucide-react';
 
 export const AuthScreen: React.FC = () => {
   const { loginWithGoogle, loginWithApple, loginAsDemo, isFirebaseReady } = useApp();
@@ -61,9 +60,11 @@ export const AuthScreen: React.FC = () => {
 
         {/* Brand Header */}
         <div className="text-center mb-6 select-none">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-pink-500 shadow-2xl shadow-indigo-500/35 text-white mb-3 transition-transform hover:scale-105 duration-300">
-            <Sparkles className="w-8 h-8" />
-          </div>
+          <img
+            src="/studyflow-logo.png"
+            alt="StudyFlow"
+            className="w-16 h-16 object-contain mb-3 drop-shadow-xl transition-transform hover:scale-105 duration-300 inline-block select-none pointer-events-none"
+          />
           <h1 className="text-3xl sm:text-4xl font-black tracking-tight bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-700 dark:from-white dark:via-indigo-200 dark:to-slate-300 bg-clip-text text-transparent">
             StudyFlow
           </h1>

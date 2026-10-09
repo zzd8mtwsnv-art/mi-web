@@ -8,7 +8,6 @@ import { QuickAddModal } from './components/layout/QuickAddModal';
 import { NotificationsModal } from './components/layout/NotificationsModal';
 import { ProfileModal } from './components/auth/ProfileModal';
 import { AuthScreen } from './components/auth/AuthScreen';
-import { Sparkles } from 'lucide-react';
 
 // Views
 import { DashboardView } from './components/dashboard/DashboardView';
@@ -32,9 +31,11 @@ const MainContent: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-[#080d1a] bg-mesh-light dark:bg-mesh-dark">
         <div className="relative flex flex-col items-center">
-          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-pink-500 shadow-2xl shadow-indigo-500/35 flex items-center justify-center text-white mb-4 animate-bounce">
-            <Sparkles className="w-8 h-8" />
-          </div>
+          <img
+            src="/studyflow-logo.png"
+            alt="StudyFlow"
+            className="w-16 h-16 object-contain mb-4 drop-shadow-xl animate-bounce select-none pointer-events-none"
+          />
           <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">
             StudyFlow
           </h1>
